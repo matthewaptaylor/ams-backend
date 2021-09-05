@@ -4,11 +4,13 @@ module.exports = {
     es6: true,
     node: true,
   },
-  extends: [
-    "eslint:recommended",
-    "google",
-  ],
+  extends: ["eslint:recommended", "google"],
   rules: {
     quotes: ["error", "double"],
+    "quote-props": ["error", "as-needed", {keywords: false}],
+    "linebreak-style": [
+      "error",
+      process.platform === "win32" ? "windows" : "unix",
+    ],
   },
 };

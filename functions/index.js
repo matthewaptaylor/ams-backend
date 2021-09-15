@@ -102,10 +102,12 @@ exports.activityPlannerGetActivities = functions.https.onCall(
   async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
 
+    const uid = context.auth.uid;
+
     const activities = await admin
       .firestore()
       .collection("activities")
-      .where(`peopleByUID.${context.auth.uid}`, "in", [
+      .where(`peopleByUID.${uid}`, "in", [
         "Activity Leader",
         "Assisting",
         "Editor",
@@ -113,7 +115,11 @@ exports.activityPlannerGetActivities = functions.https.onCall(
       ])
       .get();
 
-    return activities.docs.map((activity) => activity.data().name);
+    return activities.docs.map((activity) => ({
+      id: activity.id,
+      name: activity.data().name,
+      role: activity.data().peopleByUID[uid],
+    }));
   }
 );
 

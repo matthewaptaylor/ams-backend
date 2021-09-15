@@ -7,7 +7,10 @@ module.exports = {
   extends: ["eslint:recommended", "google"],
   rules: {
     quotes: ["error", "double"],
-    "quote-props": ["error", "as-needed", {keywords: false}],
+    indent: ["error", 2],
+    "max-len": ["error", { code: 100 }],
+    "object-curly-spacing": ["error", "always"],
+    "quote-props": ["error", "as-needed", { keywords: false }],
     "linebreak-style": [
       "error",
       process.platform === "win32" ? "windows" : "unix",

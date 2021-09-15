@@ -11,7 +11,7 @@
   },
   "emulators": {
     "firestore": {
-      "port": 5002
+      "port": 5008
     },
     "auth": {
       "port": 9099

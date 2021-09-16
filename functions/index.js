@@ -2,7 +2,6 @@ const functions = require("firebase-functions");
 
 // The Firebase Admin SDK to access Firestore.
 const admin = require("firebase-admin");
-const { check } = require("prettier");
 const { auth } = require("firebase-admin");
 const { firebaseConfig } = require("firebase-functions");
 const { user } = require("firebase-functions/v1/auth");
@@ -98,8 +97,9 @@ const checkRules = (fields, preventException = false) => {
   return true;
 };
 
-exports.activityPlannerGetActivities = functions.https.onCall(
-  async (data, context) => {
+exports.activityPlannerGetActivities = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
 
     const uid = context.auth.uid;
@@ -120,11 +120,11 @@ exports.activityPlannerGetActivities = functions.https.onCall(
       name: activity.data().name,
       role: activity.data().peopleByUID[uid],
     }));
-  }
-);
+  });
 
-exports.activityPlannerCreateActivity = functions.https.onCall(
-  async (data, context) => {
+exports.activityPlannerCreateActivity = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
 
     // Define document
@@ -235,33 +235,39 @@ exports.activityPlannerCreateActivity = functions.https.onCall(
       .add(documentTemplate);
 
     return { id: id };
-  }
-);
+  });
 
-exports.getUserByEmail = functions.https.onCall(async (data, context) => {
-  if (!data.email)
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      `The argument email is undefined.`
-    );
+exports.getUserByEmail = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
 
-  const users = await admin.auth().getUsers([{ email: data.email }]);
+    if (!data.email)
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `The argument email is undefined.`
+      );
 
-  return {
-    userExists: !!users.users[0],
-    email: users.users[0]?.email,
-    displayName: users.users[0]?.displayName,
-    photoURL: users.users[0]?.photoURL,
-  };
-});
+    const users = await admin.auth().getUsers([{ email: data.email }]);
 
-exports.createAccountDocument = functions.auth.user().onCreate((user) => {
-  // Create a document for every new user
+    return {
+      userExists: !!users.users[0],
+      email: users.users[0]?.email,
+      displayName: users.users[0]?.displayName,
+      photoURL: users.users[0]?.photoURL,
+    };
+  });
 
-  const document = {
-    uid: user.uid,
-  };
+exports.createAccountDocument = functions
+  .region("australia-southeast1")
+  .auth.user()
+  .onCreate((user) => {
+    // Create a document for every new user
 
-  // Write new doc to users collection
-  return admin.firestore().collection("users").doc(user.uid).set(document);
-});
+    const document = {
+      uid: user.uid,
+    };
+
+    // Write new doc to users collection
+    return admin.firestore().collection("users").doc(user.uid).set(document);
+  });

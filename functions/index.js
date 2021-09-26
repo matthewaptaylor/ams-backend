@@ -1,17 +1,30 @@
+/* eslint-disable no-multi-str */
 const functions = require("firebase-functions");
 
 // The Firebase Admin SDK to access Firestore.
 const admin = require("firebase-admin");
-const { auth } = require("firebase-admin");
-const { firebaseConfig } = require("firebase-functions");
-const { user } = require("firebase-functions/v1/auth");
 admin.initializeApp();
 
 // General exceptions
 const authenticationError = () =>
   new functions.https.HttpsError(
     "unauthenticated",
-    "The function must be called while authenticated."
+    "The function must be called while authenticated.",
+  );
+const parametersError = (id) =>
+  new functions.https.HttpsError(
+    "invalid-argument",
+    "No parameters have been provided.",
+  );
+const existError = (id) =>
+  new functions.https.HttpsError(
+    "invalid-argument",
+    `The activity ${id} doesn't exist.`,
+  );
+const accessError = () =>
+  new functions.https.HttpsError(
+    "unauthenticated",
+    "You do not have access to this activity.",
   );
 
 // Rules
@@ -21,7 +34,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is undefined.`
+        `The argument ${argumentName} is undefined.`,
       ),
   },
   string: {
@@ -29,7 +42,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not a string.`
+        `The argument ${argumentName} is not a string.`,
       ),
   },
   number: {
@@ -37,7 +50,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not a number.`
+        `The argument ${argumentName} is not a number.`,
       ),
   },
   array: {
@@ -45,7 +58,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not an array.`
+        `The argument ${argumentName} is not an array.`,
       ),
   },
   peopleArray: {
@@ -56,13 +69,13 @@ const RULES = {
         (person) =>
           /.+@.+/.test(person.email) &&
           ["Activity Leader", "Assisting", "Editor", "Viewer"].includes(
-            person.role
-          )
+            person.role,
+          ),
       ),
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} must contain objects with valid email and role properties.`
+        `The argument ${argumentName} must contain objects with valid email and role properties.`,
       ),
   },
 };
@@ -131,25 +144,33 @@ exports.activityPlannerCreateActivity = functions
     const fields = [
       {
         name: "name",
-        value: data.name,
+        value: data?.name,
         rules: [RULES.defined, RULES.string],
       },
       {
         name: "location",
-        value: data.location,
+        value: data?.location,
         rules: [RULES.string],
       },
       {
-        name: "startTimestamp",
-        value: data.startTimestamp,
-        rules: [RULES.number],
-        conversion: (v) => new Date(v),
+        name: "startDate",
+        value: data?.startDate,
+        rules: [RULES.string],
       },
       {
-        name: "endTimestamp",
-        value: data.endTimestamp,
-        rules: [RULES.number],
-        conversion: (v) => new Date(v),
+        name: "startTime",
+        value: data?.startTime,
+        rules: [RULES.string],
+      },
+      {
+        name: "endDate",
+        value: data?.startDate,
+        rules: [RULES.string],
+      },
+      {
+        name: "endTime",
+        value: data?.startTime,
+        rules: [RULES.string],
       },
     ];
 
@@ -157,15 +178,10 @@ exports.activityPlannerCreateActivity = functions
     checkRules(fields);
 
     // Write each field with a value into a template that can be inserted into Firestore
-    let documentTemplate = {};
+    const documentTemplate = {};
     fields.forEach((field) => {
       if (field.value != null && field.value !== "") {
-        // Apply conversion function to value if one is specified
-        const value = field.conversion
-          ? field.conversion(field.value)
-          : field.value;
-
-        documentTemplate[field.name] = value;
+        documentTemplate[field.name] = field.value;
       }
     });
 
@@ -176,7 +192,7 @@ exports.activityPlannerCreateActivity = functions
     ) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "There must be one Activity Leader."
+        "There must be one Activity Leader.",
       );
     }
 
@@ -196,14 +212,14 @@ exports.activityPlannerCreateActivity = functions
       .getUsers(
         data.people.map((person) => {
           return { email: person.email };
-        })
+        }),
       )
       .then((users) => {
         // Add people who are users to peopleByUID
         users.users.forEach((user) => {
           // Add uid: role key value pair to peopleByUID
           documentTemplate.peopleByUID[user.uid] = data.people.find(
-            (person) => person.email === user.email
+            (person) => person.email === user.email,
           ).role;
         });
 
@@ -211,7 +227,7 @@ exports.activityPlannerCreateActivity = functions
         users.notFound.forEach((user) => {
           // Add email: role key value pair to peopleByEmail
           documentTemplate.peopleByEmail[user.email] = data.people.find(
-            (person) => person.email === user.email
+            (person) => person.email === user.email,
           ).role;
         });
       });
@@ -219,12 +235,13 @@ exports.activityPlannerCreateActivity = functions
     // Check that at least one person with an account has editing access
     if (
       !Object.values(documentTemplate.peopleByUID).some((role) =>
-        ["Activity Leader", "Editor", "Assisting"].includes(role)
+        ["Activity Leader", "Editor", "Assisting"].includes(role),
       )
     ) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "At least one person with either an Activity Leader, Editor or Assisting role must currently have an account."
+        "At least one person with either an Activity Leader, Editor or Assisting role must \
+        currently have an account.",
       );
     }
 
@@ -237,37 +254,145 @@ exports.activityPlannerCreateActivity = functions
     return { id: id };
   });
 
-exports.getUserByEmail = functions
+exports.getUsersByEmail = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
 
-    if (!data.email)
+    // Check input
+    if (!data.emails) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        `The argument email is undefined.`
+        "The argument emails is undefined.",
       );
+    }
 
-    const users = await admin.auth().getUsers([{ email: data.email }]);
+    if (!Array.isArray(data.emails)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "The argument emails is not an array.",
+      );
+    }
 
-    return {
-      userExists: !!users.users[0],
-      email: users.users[0]?.email,
-      displayName: users.users[0]?.displayName,
-      photoURL: users.users[0]?.photoURL,
-    };
+    const users = await admin
+      .auth()
+      .getUsers(data.emails.map((email) => ({ email: email })));
+
+    return [
+      ...users.users.map((user) => ({
+        userExists: true,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+      })),
+      ...users.notFound.map((user) => ({
+        userExists: false,
+        email: user.email,
+      })),
+    ];
   });
 
-exports.createAccountDocument = functions
+exports.activityOverviewGet = functions
   .region("australia-southeast1")
-  .auth.user()
-  .onCreate((user) => {
-    // Create a document for every new user
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data?.id) throw existError(data.id); // Ensure activity id is given
 
-    const document = {
-      uid: user.uid,
-    };
+    // Get activity
+    const activity = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .get();
 
-    // Write new doc to users collection
-    return admin.firestore().collection("users").doc(user.uid).set(document);
+    if (!activity.exists) throw existError(data.id); // Check activity exists
+
+    // Check user has access to activity
+    if (!Object.keys(activity.data().peopleByUID).includes(context.auth.uid)) {
+      throw accessError();
+    }
+
+    return Object.fromEntries(
+      ["name", "location", "startDate", "startTime", "endDate", "endTime"].map(
+        (name) => [name, activity.data()[name]],
+      ),
+    );
+  });
+
+exports.activityOverviewSet = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data.id) throw existError(data.id); // Ensure activity id is given
+
+    // Check arguments
+    const fields = [
+      {
+        name: "name",
+        value: data?.name,
+        rules: [RULES.string],
+      },
+      {
+        name: "location",
+        value: data?.location,
+        rules: [RULES.string],
+      },
+      {
+        name: "startDate",
+        value: data?.startDate,
+        rules: [RULES.string],
+      },
+      {
+        name: "startTime",
+        value: data?.startTime,
+        rules: [RULES.string],
+      },
+      {
+        name: "endDate",
+        value: data?.endDate,
+        rules: [RULES.string],
+      },
+      {
+        name: "endTime",
+        value: data?.endTime,
+        rules: [RULES.string],
+      },
+    ];
+    checkRules(fields);
+
+    // Check activity
+    const activity = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .get();
+
+    if (!activity.exists) throw existError(data.id); // Activity doesn't exist
+    if (!Object.keys(activity.data().peopleByUID).includes(context.auth.uid)) {
+      throw accessError();
+    } // No access
+
+    // Sort out data to write to firestore
+    const documentTemplate = Object.fromEntries(
+      fields.map((field) =>
+        field.value === undefined ? [] : [field.name, field.value],
+      ),
+    );
+    delete documentTemplate.undefined;
+
+    // Enforce required for name if exists
+    if ("name" in documentTemplate && !documentTemplate.name.trim()) {
+      throw RULES.defined.exception("name");
+    }
+
+    // Set data
+    await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .update(documentTemplate);
+
+    return true;
   });

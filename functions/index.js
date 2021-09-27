@@ -9,7 +9,7 @@ admin.initializeApp();
 const authenticationError = () =>
   new functions.https.HttpsError(
     "unauthenticated",
-    "The function must be called while authenticated.",
+    "You must be signed in to do this.",
   );
 const parametersError = (id) =>
   new functions.https.HttpsError(
@@ -19,7 +19,7 @@ const parametersError = (id) =>
 const existError = (id) =>
   new functions.https.HttpsError(
     "invalid-argument",
-    `The activity ${id} doesn't exist.`,
+    `The activity (ID: ${id}) doesn't exist.`,
   );
 const accessError = () =>
   new functions.https.HttpsError(
@@ -292,6 +292,7 @@ exports.getUsersByEmail = functions
     ];
   });
 
+// Gets the overview data of an activity
 exports.activityOverviewGet = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
@@ -309,17 +310,22 @@ exports.activityOverviewGet = functions
     if (!activity.exists) throw existError(data.id); // Check activity exists
 
     // Check user has access to activity
-    if (!Object.keys(activity.data().peopleByUID).includes(context.auth.uid)) {
-      throw accessError();
-    }
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError();
 
-    return Object.fromEntries(
+    // Prepare neccessary data
+    const returnData = Object.fromEntries(
       ["name", "location", "startDate", "startTime", "endDate", "endTime"].map(
         (name) => [name, activity.data()[name]],
       ),
     );
+
+    // Include the current user's role
+    returnData.role = activity.data().peopleByUID[context.auth.uid];
+
+    return returnData;
   });
 
+// Sets overview data for an activity
 exports.activityOverviewSet = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
@@ -370,9 +376,7 @@ exports.activityOverviewSet = functions
       .get();
 
     if (!activity.exists) throw existError(data.id); // Activity doesn't exist
-    if (!Object.keys(activity.data().peopleByUID).includes(context.auth.uid)) {
-      throw accessError();
-    } // No access
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
 
     // Sort out data to write to firestore
     const documentTemplate = Object.fromEntries(
@@ -395,4 +399,167 @@ exports.activityOverviewSet = functions
       .update(documentTemplate);
 
     return true;
+  });
+
+// Gets the people data of an activity
+exports.activityPeopleGet = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data?.id) throw existError(data.id); // Ensure activity id is given
+
+    // Get activity
+    const activity = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .get();
+
+    if (!activity.exists) throw existError(data.id); // Check activity exists
+
+    // Check user has access to activity
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError();
+
+    // Prepare neccessary data
+    const returnData = Object.fromEntries(
+      ["peopleByUID", "peopleByEmail"].map((name) => [
+        name,
+        activity.data()[name],
+      ]),
+    );
+
+    // Prepare user information
+    const users = await admin
+      .auth()
+      .getUsers(
+        Object.keys(returnData.peopleByUID).map((uid) => ({ uid: uid })),
+      );
+
+    returnData.infoByUID = Object.fromEntries(
+      users.users.map((user) => [
+        user.uid,
+        {
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+        },
+      ]),
+    ); // {uid: {displayName, email, photoURL}}
+
+    return returnData;
+  });
+
+// Adds a person to an activity, or otherwise updates their role. Removing a role removes access.
+exports.activityPeopleUpdate = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data.id) throw existError(data.id); // Ensure activity id is given
+
+    // Check arguments
+    const fields = [
+      {
+        name: "email",
+        value: data?.email,
+        rules: [RULES.defined, RULES.string,
+          {
+            condition: (v) =>
+              v == null ||
+              /.+@.+/.test(v),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} must be a valid email.`,
+              ),
+          },
+        ],
+      },
+      {
+        name: "role",
+        value: data?.role,
+        rules: [
+          RULES.string,
+          {
+            condition: (v) =>
+              v == null ||
+              ["Activity Leader", "Assisting", "Editor", "Viewer"].includes(v),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} is not valid.`,
+              ),
+          },
+        ],
+      },
+    ];
+    checkRules(fields);
+
+    // Check activity
+    const activity = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .get();
+
+    if (!activity.exists) throw existError(data.id); // Activity doesn't exist
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+
+    // Get user information
+    const users = await admin
+      .auth()
+      .getUsers(
+        [{ email: data.email }],
+      );
+
+    const documentPath = users.users.length ?
+      ["peopleByUID", users.users[0].uid] :
+      ["peopleByEmail", data.email];
+
+
+    // Count people with editing access who currently have accounts
+    if (documentPath[0] === "peopleByUID" && (data.role == null || data.role === "Viewer")) {
+      // Trying to delete person with current account
+      const editingUsers = Object.values(activity.data().peopleByUID).filter(
+        (role) => ["Activity Leader", "Assisting", "Editor"].includes(role),
+      ).length;
+
+      if (editingUsers <= 1) {
+        // Only one person with current account
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "At least one person with an AMS account must have editor access.",
+        );
+      }
+    }
+
+    // Set data
+    await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .update(new admin.firestore.FieldPath(...documentPath),
+        data.role ?? admin.firestore.FieldValue.delete());
+
+    // Give details for new user
+    const returnData = { infoByUID: {} };
+
+    if (users.users.length) {
+      // Add person's account details
+      const user = users.users[0];
+      returnData.infoByUID[user.uid] = {
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+      };
+
+      // Add user role
+      returnData.peopleByUID = { [users.users[0].uid]: data.role };
+    } else {
+      // Person has no AMS account
+      returnData.peopleByEmail = { [data.email]: data.role };
+    }
+
+    return returnData;
   });

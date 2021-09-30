@@ -5,11 +5,15 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
+// Mail
+const nodemailer = require("nodemailer");
+const { google } = require("googleapis");
+const OAuth2 = google.auth.OAuth2;
+
 // General exceptions
 const authenticationError = () =>
   new functions.https.HttpsError(
-    "unauthenticated",
-    "You must be signed in to do this.",
+    "unauthenticated", "You must be signed in to do this.",
   );
 const parametersError = (id) =>
   new functions.https.HttpsError(
@@ -61,23 +65,6 @@ const RULES = {
         `The argument ${argumentName} is not an array.`,
       ),
   },
-  peopleArray: {
-    // Checks that the array submitted contains objects with the keys email and role
-    condition: (v) =>
-      v == null ||
-      v.every(
-        (person) =>
-          /.+@.+/.test(person.email) &&
-          ["Activity Leader", "Assisting", "Editor", "Viewer"].includes(
-            person.role,
-          ),
-      ),
-    exception: (argumentName) =>
-      new functions.https.HttpsError(
-        "invalid-argument",
-        `The argument ${argumentName} must contain objects with valid email and role properties.`,
-      ),
-  },
 };
 
 /**
@@ -110,6 +97,44 @@ const checkRules = (fields, preventException = false) => {
   return true;
 };
 
+/**
+ * Sends an email
+ */
+const sendEmail = (...message) => {
+  const oauth2Client = new OAuth2(
+    functions.config().gmail.clientid, // Client ID
+    functions.config().gmail.clientsecret,
+    "https://developers.google.com/oauthplayground", // Redirect URL
+  );
+
+  oauth2Client.setCredentials({
+    refresh_token: functions.config().gmail.refreshtoken,
+  });
+
+  const accessToken = oauth2Client.getAccessToken();
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      type: "OAuth2",
+      user: functions.config().gmail.user,
+      clientId: functions.config().gmail.clientid,
+      clientSecret: functions.config().gmail.clientsecret,
+      refreshToken: functions.config().gmail.refreshtoken,
+      accessToken: accessToken,
+    },
+  });
+
+  message = {
+    ...message,
+    from: functions.config().gmail.user,
+  };
+
+  return transporter.sendMail(message, (error, data) => {
+    console.log(error, data);
+  });
+};
+
 exports.activityPlannerGetActivities = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
@@ -139,6 +164,7 @@ exports.activityPlannerCreateActivity = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!data) throw parametersError(); // Ensure parameters have been provided
 
     // Define document
     const fields = [
@@ -147,103 +173,22 @@ exports.activityPlannerCreateActivity = functions
         value: data?.name,
         rules: [RULES.defined, RULES.string],
       },
-      {
-        name: "location",
-        value: data?.location,
-        rules: [RULES.string],
-      },
-      {
-        name: "startDate",
-        value: data?.startDate,
-        rules: [RULES.string],
-      },
-      {
-        name: "startTime",
-        value: data?.startTime,
-        rules: [RULES.string],
-      },
-      {
-        name: "endDate",
-        value: data?.startDate,
-        rules: [RULES.string],
-      },
-      {
-        name: "endTime",
-        value: data?.startTime,
-        rules: [RULES.string],
-      },
     ];
 
     // Ensure all fields meet their rules
     checkRules(fields);
 
-    // Write each field with a value into a template that can be inserted into Firestore
-    const documentTemplate = {};
-    fields.forEach((field) => {
-      if (field.value != null && field.value !== "") {
-        documentTemplate[field.name] = field.value;
-      }
-    });
-
-    // Check that there is exactly one activity leader
-    if (
-      data.people.filter((person) => person.role === "Activity Leader")
-        .length !== 1
-    ) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "There must be one Activity Leader.",
-      );
-    }
-
-    // Convert people into two values that can be stored in firestore,
-    // peopleUID and peopleEmail (to store users not yet signed up).
-
-    // Check people array is valid
-    [RULES.defined, RULES.array, RULES.peopleArray].forEach((rule) => {
-      if (!rule.condition(data.people)) throw rule.exception("people");
-    });
-
-    documentTemplate.peopleByUID = {};
-    documentTemplate.peopleByEmail = {};
-
-    await admin
-      .auth()
-      .getUsers(
-        data.people.map((person) => {
-          return { email: person.email };
-        }),
-      )
-      .then((users) => {
-        // Add people who are users to peopleByUID
-        users.users.forEach((user) => {
-          // Add uid: role key value pair to peopleByUID
-          documentTemplate.peopleByUID[user.uid] = data.people.find(
-            (person) => person.email === user.email,
-          ).role;
-        });
-
-        // Add people who are not users
-        users.notFound.forEach((user) => {
-          // Add email: role key value pair to peopleByEmail
-          documentTemplate.peopleByEmail[user.email] = data.people.find(
-            (person) => person.email === user.email,
-          ).role;
-        });
-      });
-
-    // Check that at least one person with an account has editing access
-    if (
-      !Object.values(documentTemplate.peopleByUID).some((role) =>
-        ["Activity Leader", "Editor", "Assisting"].includes(role),
-      )
-    ) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "At least one person with either an Activity Leader, Editor or Assisting role must \
-        currently have an account.",
-      );
-    }
+    // Sort out data to write to firestore
+    const documentTemplate = {
+      name: data.name,
+      location: "",
+      startDate: "",
+      startTime: "",
+      endDate: "",
+      endTime: "",
+      peopleByUID: { [context.auth.uid]: "Editor" },
+      peopleByEmail: {},
+    };
 
     // Add document to database
     const { id } = await admin
@@ -252,44 +197,6 @@ exports.activityPlannerCreateActivity = functions
       .add(documentTemplate);
 
     return { id: id };
-  });
-
-exports.getUsersByEmail = functions
-  .region("australia-southeast1")
-  .https.onCall(async (data, context) => {
-    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
-
-    // Check input
-    if (!data.emails) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "The argument emails is undefined.",
-      );
-    }
-
-    if (!Array.isArray(data.emails)) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "The argument emails is not an array.",
-      );
-    }
-
-    const users = await admin
-      .auth()
-      .getUsers(data.emails.map((email) => ({ email: email })));
-
-    return [
-      ...users.users.map((user) => ({
-        userExists: true,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-      })),
-      ...users.notFound.map((user) => ({
-        userExists: false,
-        email: user.email,
-      })),
-    ];
   });
 
 // Gets the overview data of an activity
@@ -384,6 +291,7 @@ exports.activityOverviewSet = functions
         field.value === undefined ? [] : [field.name, field.value],
       ),
     );
+
     delete documentTemplate.undefined;
 
     // Enforce required for name if exists
@@ -429,7 +337,7 @@ exports.activityPeopleGet = functions
       ]),
     );
 
-    // Prepare user information
+    // ,,Prepare user information
     const users = await admin
       .auth()
       .getUsers(
@@ -445,7 +353,7 @@ exports.activityPeopleGet = functions
           photoURL: user.photoURL,
         },
       ]),
-    ); // {uid: {displayName, email, photoURL}}
+    ); // {uid: ,,displayName, email, photoURL}}
 
     return returnData;
   });
@@ -463,11 +371,11 @@ exports.activityPeopleUpdate = functions
       {
         name: "email",
         value: data?.email,
-        rules: [RULES.defined, RULES.string,
+        rules: [
+          RULES.defined,
+          RULES.string,
           {
-            condition: (v) =>
-              v == null ||
-              /.+@.+/.test(v),
+            condition: (v) => v == null || /.+@.+/.test(v),
             exception: (argumentName) =>
               new functions.https.HttpsError(
                 "invalid-argument",
@@ -507,20 +415,19 @@ exports.activityPeopleUpdate = functions
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
 
     // Get user information
-    const users = await admin
-      .auth()
-      .getUsers(
-        [{ email: data.email }],
-      );
+    const users = await admin.auth().getUsers([{ email: data.email }]);
 
     const documentPath = users.users.length ?
       ["peopleByUID", users.users[0].uid] :
       ["peopleByEmail", data.email];
 
-
     // Count people with editing access who currently have accounts
-    if (documentPath[0] === "peopleByUID" && (data.role == null || data.role === "Viewer")) {
-      // Trying to delete person with current account
+    if (
+      documentPath[0] === "peopleByUID" &&
+      (data.role == null || data.role === "Viewer") &&
+      activity.data().peopleByUID[users.users[0].uid] !== "Viewer"
+    ) {
+      // Trying to delete person with current account with editing permissions
       const editingUsers = Object.values(activity.data().peopleByUID).filter(
         (role) => ["Activity Leader", "Assisting", "Editor"].includes(role),
       ).length;
@@ -539,8 +446,17 @@ exports.activityPeopleUpdate = functions
       .firestore()
       .collection("activities")
       .doc(data.id)
-      .update(new admin.firestore.FieldPath(...documentPath),
-        data.role ?? admin.firestore.FieldValue.delete());
+      .update(
+        new admin.firestore.FieldPath(...documentPath),
+        data.role ?? admin.firestore.FieldValue.delete(),
+      );
+
+    // Notify user of change
+    await sendEmail({
+      to: "test@gmail.com",
+      subject: "Message title",
+      text: "Plaintext version of the message",
+      html: "<p>HTML version of the message</p>" });
 
     // Give details for new user
     const returnData = { infoByUID: {} };

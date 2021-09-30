@@ -100,19 +100,17 @@ const checkRules = (fields, preventException = false) => {
 /**
  * Sends an email
  */
-const sendEmail = (...message) => {
+const sendEmail = async (to, subject, message) => {
+  // Initialise connection
   const oauth2Client = new OAuth2(
-    functions.config().gmail.clientid, // Client ID
+    functions.config().gmail.clientid,
     functions.config().gmail.clientsecret,
-    "https://developers.google.com/oauthplayground", // Redirect URL
+    "https://developers.google.com/oauthplayground",
   );
-
   oauth2Client.setCredentials({
     refresh_token: functions.config().gmail.refreshtoken,
   });
-
   const accessToken = oauth2Client.getAccessToken();
-
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -125,13 +123,17 @@ const sendEmail = (...message) => {
     },
   });
 
-  message = {
-    ...message,
-    from: functions.config().gmail.user,
-  };
+  // Format message
+  const template = `<!DOCTYPE html> <html lang="en"> <head> <meta content="width=device-width" name="viewport"> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"> <title>AMS - Scouts Aotearoa</title> <style> @media all { .ExternalClass { width: 100%; } .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div { line-height: 100%; } .apple-link a { color: inherit !important; font-family: inherit !important; font-size: inherit !important; font-weight: inherit !important; line-height: inherit !important; text-decoration: none !important; } #MessageViewBody a { color: inherit; text-decoration: none; font-size: inherit; font-family: inherit; font-weight: inherit; line-height: inherit; } } </style> </head> <body style="background: #fafafa;margin: 0;padding: 1rem;font-family: Verdana, sans-serif;"> <table border="0" cellpadding="0" cellspacing="0" class="body" role="presentation" style="max-width: 30rem;width: 100%;margin: 0 auto;"> <tbody> <tr> <td style="background-color: #5f249f;padding: 1rem;border-radius: 0.5rem 0.5rem 0 0;"> <img src="https://ams-scouts-aotearoa.web.app/img/email.png" alt="AMS - Scouts Aotearoa Logo" style="display: block;margin: 0 auto;font-weight: bold;width: 100%;max-width: 20rem;color: #ffffff;text-align: center;"> </td> </tr> <tr> <td style="background-color: #ffffff;padding: 1rem;border-radius: 0 0 0.5rem 0.5rem">
+      <p>${message.join("</p> <p>")}</p>
+    </td> </tr> <tr> <td style="padding: 1rem;text-align: center;font-size: 0.8rem;color: rgb(150, 150, 150);"> You received this email because of an action somebody took in AMS.<br> Scouts Aotearoa, 1 Kaiwharawhara Road, Kaiwharawhara, Wellington 6035, New Zealand. </td> </tr> </tbody> </table> </body></html>`;
 
-  return transporter.sendMail(message, (error, data) => {
-    console.log(error, data);
+  return transporter.sendMail({
+    to: to,
+    subject: subject,
+    text: message.join("\n\n"),
+    html: template,
+    from: functions.config().gmail.user,
   });
 };
 
@@ -452,11 +454,9 @@ exports.activityPeopleUpdate = functions
       );
 
     // Notify user of change
-    await sendEmail({
-      to: "test@gmail.com",
-      subject: "Message title",
-      text: "Plaintext version of the message",
-      html: "<p>HTML version of the message</p>" });
+    const messageText = ["Hi, $email.", "Welcome to AMS! We're glad you decided to jump on board - we hope it'll make your life a little bit easier. You just need to set a password to login. You can do this by using this link.", "Please note this link will expire in 24 hours. If you don't get around to setting a password by then, you'll need to register again.", "If you didn't mean to register, you don't need to do anything.", "Ngā mihi."];
+    const message = sendEmail("matthewaptaylor@gmail.com", "Message title", messageText);
+    console.log(message);
 
     // Give details for new user
     const returnData = { infoByUID: {} };

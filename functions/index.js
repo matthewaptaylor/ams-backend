@@ -13,22 +13,28 @@ const OAuth2 = google.auth.OAuth2;
 // General exceptions
 const authenticationError = () =>
   new functions.https.HttpsError(
-    "unauthenticated", "You must be signed in to do this.",
+    "unauthenticated",
+    "Sorry, we need you to be signed in to do this.",
+  );
+const verifiedError = () =>
+  new functions.https.HttpsError(
+    "unauthenticated",
+    "Sorry, to ensure privacy we need to verify your email before you can do this.",
   );
 const parametersError = (id) =>
   new functions.https.HttpsError(
     "invalid-argument",
-    "No parameters have been provided.",
+    "Sorry, no parameters were provided to the server.",
   );
 const existError = (id) =>
   new functions.https.HttpsError(
     "invalid-argument",
-    `The activity (ID: ${id}) doesn't exist.`,
+    `Sorry, the activity (ID: ${id}) doesn't exist. It might've been deleted.`,
   );
 const accessError = () =>
   new functions.https.HttpsError(
     "unauthenticated",
-    "You do not have access to this activity.",
+    "Sorry, you do not have access to this activity. If you previously did, somebody probably removed your access.",
   );
 
 // Rules
@@ -133,7 +139,7 @@ const sendEmail = async (to, subject, message) => {
     subject: subject,
     text: message.join("\n\n"),
     html: template,
-    from: functions.config().gmail.user,
+    from: `"Activity Management System - Scouts Aotearoa" <${functions.config().gmail.user}>`,
   });
 };
 
@@ -141,9 +147,44 @@ exports.activityPlannerGetActivities = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
 
     const uid = context.auth.uid;
+    const email = context.auth.token.email;
 
+    // Database path of records
+    const emailPath = `peopleByEmail.${email.replace(/\./g, "&period;")}`;
+    const uidPath = `peopleByUID.${uid}`;
+
+    if (context.auth.token.email_verified) {
+      // If verified, check any peopleByEmail records exist
+
+      const emailActivities = await admin
+        .firestore()
+        .collection("activities")
+        .where(emailPath, "in", [
+          "Activity Leader",
+          "Assisting",
+          "Editor",
+          "Viewer"],
+        ).get();
+
+      // Activities that are assigned to the user by email, not UID
+      await emailActivities.docs.forEach(
+        async (activity) => {
+          // Switch peopleByEmail entry to peopleByUID
+          await admin.firestore()
+            .collection("activities")
+            .doc(activity.id)
+            .update({
+              [emailPath]: admin.firestore.FieldValue.delete(),
+              [uidPath]: activity.data().peopleByEmail[email],
+            });
+        },
+      );
+    }
+
+    // Get all activities assigned by UID
     const activities = await admin
       .firestore()
       .collection("activities")
@@ -166,6 +207,7 @@ exports.activityPlannerCreateActivity = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
 
     // Define document
@@ -206,6 +248,7 @@ exports.activityOverviewGet = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
     if (!data?.id) throw existError(data.id); // Ensure activity id is given
 
@@ -239,6 +282,7 @@ exports.activityOverviewSet = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
     if (!data.id) throw existError(data.id); // Ensure activity id is given
 
@@ -316,6 +360,7 @@ exports.activityPeopleGet = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
     if (!data?.id) throw existError(data.id); // Ensure activity id is given
 
@@ -365,6 +410,7 @@ exports.activityPeopleUpdate = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
     if (!data.id) throw existError(data.id); // Ensure activity id is given
 
@@ -421,7 +467,7 @@ exports.activityPeopleUpdate = functions
 
     const documentPath = users.users.length ?
       ["peopleByUID", users.users[0].uid] :
-      ["peopleByEmail", data.email];
+      ["peopleByEmail", data.email.replace(/\./g, "&period;")];
 
     // Count people with editing access who currently have accounts
     if (
@@ -438,7 +484,7 @@ exports.activityPeopleUpdate = functions
         // Only one person with current account
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "At least one person with an AMS account must have editor access.",
+          "Sorry, at least one person with an AMS account must always have editor access or above.",
         );
       }
     }
@@ -454,9 +500,22 @@ exports.activityPeopleUpdate = functions
       );
 
     // Notify user of change
-    const messageText = ["Hi, $email.", "Welcome to AMS! We're glad you decided to jump on board - we hope it'll make your life a little bit easier. You just need to set a password to login. You can do this by using this link.", "Please note this link will expire in 24 hours. If you don't get around to setting a password by then, you'll need to register again.", "If you didn't mean to register, you don't need to do anything.", "Ngā mihi."];
-    const message = sendEmail("matthewaptaylor@gmail.com", "Message title", messageText);
-    console.log(message);
+    if (data.role && users.users[0]?.uid !== context.auth.uid) {
+      // Changed another user's role, not deleted
+      const messageText = [
+        `Hi, ${users.users[0]?.displayName ?? data.email}.`,
+        `You have been assigned to the role of ${data.role} for the activity ${activity.data().name}. You can find this activity here:`,
+        `https://ams-scouts-aotearoa.web.app/activity/${data.id}/people`,
+        "Ngā mihi.",
+      ];
+
+      const message = sendEmail(
+        data.email,
+        `Your role of ${data.role} for ${activity.data().name}`,
+        messageText,
+      );
+      console.log(message);
+    }
 
     // Give details for new user
     const returnData = { infoByUID: {} };

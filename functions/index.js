@@ -514,7 +514,6 @@ exports.activityPeopleUpdate = functions
         `Your role of ${data.role} for ${activity.data().name}`,
         messageText,
       );
-      console.log(message);
     }
 
     // Give details for new user
@@ -537,4 +536,139 @@ exports.activityPeopleUpdate = functions
     }
 
     return returnData;
+  });
+
+// Gets the overview data of an activity
+exports.activityRAMSGet = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data?.id) throw existError(data.id); // Ensure activity id is given
+
+    // Get activity
+    const activity = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .get();
+
+
+    if (!activity.exists) throw existError(data.id); // Check activity exists
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // User has access
+
+    const risks = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id).collection("risks")
+      .get();
+
+    // Return all risks
+    return Object.fromEntries(risks.docs.map((risk) => [risk.id, risk.data()]));
+  });
+
+// Updates a rams risk for the activity
+exports.activityRAMSUpdate = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data.id) throw existError(data.id); // Ensure activity id is given
+
+    // Check arguments
+    const fields = [
+      {
+        name: "category",
+        value: data?.category,
+        rules: [RULES.defined, RULES.string,
+          {
+            condition: (v) =>
+              v == null ||
+              ["People", "Environment", "Equipment"].includes(v),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} is not valid.`,
+              ),
+          },
+        ],
+      },
+      {
+        name: "hazard",
+        value: data?.hazard,
+        rules: [RULES.defined, RULES.string],
+      },
+      {
+        name: "risk",
+        value: data?.risk,
+        rules: [RULES.defined, RULES.string],
+      },
+      {
+        name: "controls",
+        value: data?.controls,
+        rules: [RULES.defined, RULES.string],
+      },
+      {
+        name: "responsibility",
+        value: data?.responsibility,
+        rules: [RULES.defined, RULES.string],
+      },
+      {
+        name: "likelihood",
+        value: data?.likelihood,
+        rules: [RULES.defined, RULES.string,
+          {
+            condition: (v) =>
+              v == null ||
+              ["Almost certain", "Highly likely", "Likely", "Unlikely", "Remote"].includes(v),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} is not valid.`,
+              ),
+          }],
+      },
+      {
+        name: "consequence",
+        value: data?.consequence,
+        rules: [RULES.defined, RULES.string,
+          {
+            condition: (v) =>
+              v == null ||
+              ["Catastrophic", "Major", "Serious", "Minor", "Negligible"].includes(v),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} is not valid.`,
+              ),
+          }],
+      },
+    ];
+    checkRules(fields);
+
+    // Check activity
+    const activity = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .get();
+
+    if (!activity.exists) throw existError(data.id); // Activity doesn't exist
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+
+    // Sort out data to write to firestore
+    const documentTemplate = Object.fromEntries(
+      fields.map((field) => [field.name, field.value]),
+    );
+
+    // Set data
+    const newRisk = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id).collection("risks")
+      .add(documentTemplate);
+
+    return { id: newRisk.id };
   });

@@ -26,10 +26,10 @@ const parametersError = (id) =>
     "invalid-argument",
     "Sorry, no parameters were provided to the server.",
   );
-const existError = (id) =>
+const existError = (type, id) =>
   new functions.https.HttpsError(
     "invalid-argument",
-    `Sorry, the activity (ID: ${id}) doesn't exist. It might've been deleted.`,
+    `Sorry, the ${type} (ID: ${id}) doesn't exist. It might've been deleted.`,
   );
 const accessError = () =>
   new functions.https.HttpsError(
@@ -40,7 +40,7 @@ const accessError = () =>
 // Rules
 const RULES = {
   defined: {
-    condition: (v) => !!v,
+    condition: (v) => typeof v !== "undefined",
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
@@ -61,6 +61,14 @@ const RULES = {
       new functions.https.HttpsError(
         "invalid-argument",
         `The argument ${argumentName} is not a number.`,
+      ),
+  },
+  boolean: {
+    condition: (v) => v == null || typeof v === "boolean",
+    exception: (argumentName) =>
+      new functions.https.HttpsError(
+        "invalid-argument",
+        `The argument ${argumentName} is not a boolean.`,
       ),
   },
   array: {
@@ -250,7 +258,7 @@ exports.activityOverviewGet = functions
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
-    if (!data?.id) throw existError(data.id); // Ensure activity id is given
+    if (!data?.id) throw existError("activity", data.id); // Ensure activity id is given
 
     // Get activity
     const activity = await admin
@@ -259,7 +267,7 @@ exports.activityOverviewGet = functions
       .doc(data.id)
       .get();
 
-    if (!activity.exists) throw existError(data.id); // Check activity exists
+    if (!activity.exists) throw existError("activity", data.id); // Check activity exists
 
     // Check user has access to activity
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError();
@@ -284,7 +292,7 @@ exports.activityOverviewSet = functions
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
-    if (!data.id) throw existError(data.id); // Ensure activity id is given
+    if (!data.id) throw existError("activity", data.id); // Ensure activity id is given
 
     // Check arguments
     const fields = [
@@ -328,7 +336,7 @@ exports.activityOverviewSet = functions
       .doc(data.id)
       .get();
 
-    if (!activity.exists) throw existError(data.id); // Activity doesn't exist
+    if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
 
     // Sort out data to write to firestore
@@ -362,7 +370,7 @@ exports.activityPeopleGet = functions
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
-    if (!data?.id) throw existError(data.id); // Ensure activity id is given
+    if (!data?.id) throw existError("activity", data.id); // Ensure activity id is given
 
     // Get activity
     const activity = await admin
@@ -371,7 +379,7 @@ exports.activityPeopleGet = functions
       .doc(data.id)
       .get();
 
-    if (!activity.exists) throw existError(data.id); // Check activity exists
+    if (!activity.exists) throw existError("activity", data.id); // Check activity exists
 
     // Check user has access to activity
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError();
@@ -412,7 +420,7 @@ exports.activityPeopleUpdate = functions
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
-    if (!data.id) throw existError(data.id); // Ensure activity id is given
+    if (!data.id) throw existError("activity", data.id); // Ensure activity id is given
 
     // Check arguments
     const fields = [
@@ -459,7 +467,7 @@ exports.activityPeopleUpdate = functions
       .doc(data.id)
       .get();
 
-    if (!activity.exists) throw existError(data.id); // Activity doesn't exist
+    if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
 
     // Get user information
@@ -538,14 +546,14 @@ exports.activityPeopleUpdate = functions
     return returnData;
   });
 
-// Gets the overview data of an activity
+// Gets the risks of an activity, or selects one specific one if provided with a riskId.
 exports.activityRAMSGet = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
-    if (!data?.id) throw existError(data.id); // Ensure activity id is given
+    if (!data?.id) throw existError("activity", data.id); // Ensure activity id is given
 
     // Get activity
     const activity = await admin
@@ -555,17 +563,31 @@ exports.activityRAMSGet = functions
       .get();
 
 
-    if (!activity.exists) throw existError(data.id); // Check activity exists
+    if (!activity.exists) throw existError("activity", data.id); // Check activity exists
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // User has access
 
-    const risks = await admin
-      .firestore()
-      .collection("activities")
-      .doc(data.id).collection("risks")
-      .get();
+    let risks;
+    if (data.riskId) {
+      // Specific risk selected
+      risks = await admin
+        .firestore()
+        .collection("activities")
+        .doc(data.id).collection("risks").doc(data.riskId).get();
 
-    // Return all risks
-    return Object.fromEntries(risks.docs.map((risk) => [risk.id, risk.data()]));
+      if (!risks.exists) throw existError("risk", data.riskId); // Check risk exists
+
+      return risks.data();
+    } else {
+      // All risks
+      risks = await admin
+        .firestore()
+        .collection("activities")
+        .doc(data.id).collection("risks")
+        .get();
+
+      // Return all risks
+      return Object.fromEntries(risks.docs.map((risk) => [risk.id, risk.data()]));
+    }
   });
 
 // Updates a rams risk for the activity
@@ -575,7 +597,7 @@ exports.activityRAMSUpdate = functions
     if (!context.auth) throw authenticationError(); // Ensure user is authenticated
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
-    if (!data.id) throw existError(data.id); // Ensure activity id is given
+    if (!data.id) throw existError("activity", data.id); // Ensure activity id is given
 
     // Check arguments
     const fields = [
@@ -645,6 +667,11 @@ exports.activityRAMSUpdate = functions
               ),
           }],
       },
+      {
+        name: "acceptable",
+        value: data?.acceptable,
+        rules: [RULES.defined, RULES.boolean],
+      },
     ];
     checkRules(fields);
 
@@ -655,7 +682,7 @@ exports.activityRAMSUpdate = functions
       .doc(data.id)
       .get();
 
-    if (!activity.exists) throw existError(data.id); // Activity doesn't exist
+    if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
 
     // Sort out data to write to firestore
@@ -664,11 +691,43 @@ exports.activityRAMSUpdate = functions
     );
 
     // Set data
-    const newRisk = await admin
+    const risks = admin
       .firestore()
       .collection("activities")
-      .doc(data.id).collection("risks")
-      .add(documentTemplate);
+      .doc(data.id).collection("risks");
 
-    return { id: newRisk.id };
+    const newRisk = data.riskId ?
+      await risks.doc(data.riskId).set(documentTemplate) :
+      await risks.add(documentTemplate);
+
+    return { id: data.riskId ? data.riskId : newRisk.id };
+  });
+
+// Deletes a rams risk for the activity
+exports.activityRAMSDelete = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data.id) throw existError("activity", data.id); // Ensure activity id is given
+    if (!data.riskId) throw existError("risk", data.riskId); // Check risk exists
+
+    // Check activity
+    const activity = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .get();
+
+    if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+
+    // Set data
+    await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id).collection("risks").doc(data.riskId).delete();
+
+    return { id: data.riskId };
   });

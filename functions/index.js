@@ -138,7 +138,7 @@ const sendEmail = async (to, subject, message) => {
   });
 
   // Format message
-  const template = `<!DOCTYPE html> <html lang="en"> <head> <meta content="width=device-width" name="viewport"> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"> <title>AMS - Scouts Aotearoa</title> <style> @media all { .ExternalClass { width: 100%; } .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div { line-height: 100%; } .apple-link a { color: inherit !important; font-family: inherit !important; font-size: inherit !important; font-weight: inherit !important; line-height: inherit !important; text-decoration: none !important; } #MessageViewBody a { color: inherit; text-decoration: none; font-size: inherit; font-family: inherit; font-weight: inherit; line-height: inherit; } } </style> </head> <body style="background: #fafafa;margin: 0;padding: 1rem;font-family: Verdana, sans-serif;"> <table border="0" cellpadding="0" cellspacing="0" class="body" role="presentation" style="max-width: 30rem;width: 100%;margin: 0 auto;"> <tbody> <tr> <td style="background-color: #5f249f;padding: 1rem;border-radius: 0.5rem 0.5rem 0 0;"> <img src="https://ams-scouts-aotearoa.web.app/img/email.png" alt="AMS - Scouts Aotearoa Logo" style="display: block;margin: 0 auto;font-weight: bold;width: 100%;max-width: 20rem;color: #ffffff;text-align: center;"> </td> </tr> <tr> <td style="background-color: #ffffff;padding: 1rem;border-radius: 0 0 0.5rem 0.5rem">
+  const template = `<!DOCTYPE html> <html lang="en"> <head> <meta content="width=device-width" name="viewport"> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"> <title>AMS - Scouts Aotearoa</title> <style> @media all { .ExternalClass { width: 100%; } .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div { line-height: 100%; } .apple-link a { color: inherit !important; font-family: inherit !important; font-size: inherit !important; font-weight: inherit !important; line-height: inherit !important; text-decoration: none !important; } #MessageViewBody a { color: inherit; text-decoration: none; font-size: inherit; font-family: inherit; font-weight: inherit; line-height: inherit; } } </style> </head> <body style="background: #fafafa;margin: 0;padding: 1rem;font-family: Verdana, sans-serif;"> <table border="0" cellpadding="0" cellspacing="0" class="body" role="presentation" style="max-width: 30rem;width: 100%;margin: 0 auto;"> <tbody> <tr> <td style="background-color: #5f249f;padding: 1rem;border-radius: 0.5rem 0.5rem 0 0;"> <img src="https://ams.matthewtaylor.codes/img/email.png" alt="AMS - Scouts Aotearoa Logo" style="display: block;margin: 0 auto;font-weight: bold;width: 100%;max-width: 20rem;color: #ffffff;text-align: center;"> </td> </tr> <tr> <td style="background-color: #ffffff;padding: 1rem;border-radius: 0 0 0.5rem 0.5rem">
       <p>${message.join("</p> <p>")}</p>
     </td> </tr> <tr> <td style="padding: 1rem;text-align: center;font-size: 0.8rem;color: rgb(150, 150, 150);"> You received this email because of an action somebody took in AMS.<br> Scouts Aotearoa, 1 Kaiwharawhara Road, Kaiwharawhara, Wellington 6035, New Zealand. </td> </tr> </tbody> </table> </body></html>`;
 
@@ -274,7 +274,7 @@ exports.activityOverviewGet = functions
 
     // Prepare neccessary data
     const returnData = Object.fromEntries(
-      ["name", "location", "startDate", "startTime", "endDate", "endTime"].map(
+      ["name", "scoutGroup", "scoutZoneRegion", "description", "location", "startDate", "startTime", "endDate", "endTime"].map(
         (name) => [name, activity.data()[name]],
       ),
     );
@@ -299,6 +299,21 @@ exports.activityOverviewSet = functions
       {
         name: "name",
         value: data?.name,
+        rules: [RULES.string],
+      },
+      {
+        name: "scoutGroup",
+        value: data?.scoutGroup,
+        rules: [RULES.string],
+      },
+      {
+        name: "scoutZoneRegion",
+        value: data?.scoutZoneRegion,
+        rules: [RULES.string],
+      },
+      {
+        name: "description",
+        value: data?.description,
         rules: [RULES.string],
       },
       {
@@ -513,7 +528,7 @@ exports.activityPeopleUpdate = functions
       const messageText = [
         `Hi, ${users.users[0]?.displayName ?? data.email}.`,
         `You have been assigned to the role of ${data.role} for the activity ${activity.data().name}. You can find this activity here:`,
-        `https://ams-scouts-aotearoa.web.app/activity/${data.id}/people`,
+        `https://ams.matthewtaylor.codes/activity/${data.id}/people`,
         "Ngā mihi.",
       ];
 

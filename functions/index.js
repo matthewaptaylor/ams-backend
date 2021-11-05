@@ -79,6 +79,14 @@ const RULES = {
         `The argument ${argumentName} is not an array.`,
       ),
   },
+  object: {
+    condition: (v) => v == null || (v instanceof Object && !Array.isArray(v)),
+    exception: (argumentName) =>
+      new functions.https.HttpsError(
+        "invalid-argument",
+        `The argument ${argumentName} is not an object.`,
+      ),
+  },
 };
 
 /**
@@ -233,13 +241,18 @@ exports.activityPlannerCreateActivity = functions
     // Sort out data to write to firestore
     const documentTemplate = {
       name: data.name,
+      description: "",
       location: "",
+      scoutGroup: "",
+      scoutZoneRegion: "",
       startDate: "",
       startTime: "",
       endDate: "",
       endTime: "",
       peopleByUID: { [context.auth.uid]: "Editor" },
       peopleByEmail: {},
+      activityLeader: {},
+      contact: {},
     };
 
     // Add document to database
@@ -274,7 +287,7 @@ exports.activityOverviewGet = functions
 
     // Prepare neccessary data
     const returnData = Object.fromEntries(
-      ["name", "scoutGroup", "scoutZoneRegion", "description", "location", "startDate", "startTime", "endDate", "endTime"].map(
+      ["name", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "activityLeader", "contact"].map(
         (name) => [name, activity.data()[name]],
       ),
     );
@@ -302,16 +315,6 @@ exports.activityOverviewSet = functions
         rules: [RULES.string],
       },
       {
-        name: "scoutGroup",
-        value: data?.scoutGroup,
-        rules: [RULES.string],
-      },
-      {
-        name: "scoutZoneRegion",
-        value: data?.scoutZoneRegion,
-        rules: [RULES.string],
-      },
-      {
         name: "description",
         value: data?.description,
         rules: [RULES.string],
@@ -319,6 +322,16 @@ exports.activityOverviewSet = functions
       {
         name: "location",
         value: data?.location,
+        rules: [RULES.string],
+      },
+      {
+        name: "scoutGroup",
+        value: data?.scoutGroup,
+        rules: [RULES.string],
+      },
+      {
+        name: "scoutZoneRegion",
+        value: data?.scoutZoneRegion,
         rules: [RULES.string],
       },
       {
@@ -339,6 +352,61 @@ exports.activityOverviewSet = functions
       {
         name: "endTime",
         value: data?.endTime,
+        rules: [RULES.string],
+      },
+      {
+        name: "activityLeader.name",
+        value: data["activityLeader.name"],
+        rules: [RULES.string],
+      },
+      {
+        name: "activityLeader.age",
+        value: data["activityLeader.age"],
+        rules: [RULES.string],
+      },
+      {
+        name: "activityLeader.home",
+        value: data["activityLeader.home"],
+        rules: [RULES.string],
+      },
+      {
+        name: "activityLeader.work",
+        value: data["activityLeader.work"],
+        rules: [RULES.string],
+      },
+      {
+        name: "activityLeader.cell",
+        value: data["activityLeader.cell"],
+        rules: [RULES.string],
+      },
+      {
+        name: "activityLeader.address",
+        value: data["activityLeader.address"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.name",
+        value: data["contact.name"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.home",
+        value: data["contact.home"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.work",
+        value: data["contact.work"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.cell",
+        value: data["contact.cell"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.address",
+        value: data["contact.address"],
         rules: [RULES.string],
       },
     ];
@@ -367,6 +435,8 @@ exports.activityOverviewSet = functions
     if ("name" in documentTemplate && !documentTemplate.name.trim()) {
       throw RULES.defined.exception("name");
     }
+
+    console.log(documentTemplate);
 
     // Set data
     await admin
@@ -495,8 +565,8 @@ exports.activityPeopleUpdate = functions
     // Count people with editing access who currently have accounts
     if (
       documentPath[0] === "peopleByUID" &&
-      (data.role == null || data.role === "Viewer") &&
-      activity.data().peopleByUID[users.users[0].uid] !== "Viewer"
+        (data.role == null || data.role === "Viewer") &&
+        activity.data().peopleByUID[users.users[0].uid] !== "Viewer"
     ) {
       // Trying to delete person with current account with editing permissions
       const editingUsers = Object.values(activity.data().peopleByUID).filter(
@@ -510,6 +580,19 @@ exports.activityPeopleUpdate = functions
           "Sorry, at least one person with an AMS account must always have editor access or above.",
         );
       }
+    }
+
+    // Count activity leaders
+    if (
+      data.role === "Activity Leader" &&
+      (Object.values(activity.data().peopleByUID).includes("Activity Leader") ||
+      Object.values(activity.data().peopleByEmail).includes("Activity Leader"))
+    ) {
+      // Trying to make person activity leader
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Sorry, there is already an Activity Leader.",
+      );
     }
 
     // Set data
@@ -532,7 +615,7 @@ exports.activityPeopleUpdate = functions
         "Ngā mihi.",
       ];
 
-      const message = sendEmail(
+      sendEmail(
         data.email,
         `Your role of ${data.role} for ${activity.data().name}`,
         messageText,

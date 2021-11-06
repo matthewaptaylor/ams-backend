@@ -71,6 +71,14 @@ const RULES = {
         `The argument ${argumentName} is not a boolean.`,
       ),
   },
+  true: {
+    condition: (v) => v == null || !!v,
+    exception: (argumentName) =>
+      new functions.https.HttpsError(
+        "invalid-argument",
+        `The argument ${argumentName} must be true.`,
+      ),
+  },
   array: {
     condition: (v) => v == null || Array.isArray(v),
     exception: (argumentName) =>
@@ -233,6 +241,16 @@ exports.activityPlannerCreateActivity = functions
         value: data?.name,
         rules: [RULES.defined, RULES.string],
       },
+      {
+        name: "requiresAIF",
+        value: data?.requiresAIF,
+        rules: [RULES.defined, RULES.boolean],
+      },
+      {
+        name: "requiresRAMS",
+        value: data?.requiresRAMS,
+        rules: [RULES.defined, RULES.boolean],
+      },
     ];
 
     // Ensure all fields meet their rules
@@ -241,6 +259,8 @@ exports.activityPlannerCreateActivity = functions
     // Sort out data to write to firestore
     const documentTemplate = {
       name: data.name,
+      requiresAIF: data.requiresAIF,
+      requiresRAMS: data.requiresRAMS,
       description: "",
       location: "",
       scoutGroup: "",
@@ -287,7 +307,7 @@ exports.activityOverviewGet = functions
 
     // Prepare neccessary data
     const returnData = Object.fromEntries(
-      ["name", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "activityLeader", "contact"].map(
+      ["name", "requiresAIF", "requiresRAMS", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "activityLeader", "contact"].map(
         (name) => [name, activity.data()[name]],
       ),
     );
@@ -313,6 +333,16 @@ exports.activityOverviewSet = functions
         name: "name",
         value: data?.name,
         rules: [RULES.string],
+      },
+      {
+        name: "requiresAIF",
+        value: data?.requiresAIF,
+        rules: [RULES.boolean, RULES.true],
+      },
+      {
+        name: "requiresRAMS",
+        value: data?.requiresRAMS,
+        rules: [RULES.boolean, RULES.true],
       },
       {
         name: "description",

@@ -63,6 +63,14 @@ const RULES = {
         `The argument ${argumentName} is not a number.`,
       ),
   },
+  integer: {
+    condition: (v) => v == null || Number.isInteger(v),
+    exception: (argumentName) =>
+      new functions.https.HttpsError(
+        "invalid-argument",
+        `The argument ${argumentName} is not an integer.`,
+      ),
+  },
   boolean: {
     condition: (v) => v == null || typeof v === "boolean",
     exception: (argumentName) =>
@@ -93,6 +101,33 @@ const RULES = {
       new functions.https.HttpsError(
         "invalid-argument",
         `The argument ${argumentName} is not an object.`,
+      ),
+  },
+  activityCategory: {
+    condition: (v) => v == null || [
+      "Group event",
+      "Zone event",
+      "Region event",
+      "National event",
+      "Picnic",
+      "Walk",
+      "Visit to town",
+      "Visit a Group",
+      "Other A",
+      "Abseiling",
+      "Air activity",
+      "Camping",
+      "Caving",
+      "Day hike",
+      "Patrol activity",
+      "Tramping",
+      "Water activity",
+      "Other B",
+    ].includes(v),
+    exception: (argumentName) =>
+      new functions.https.HttpsError(
+        "invalid-argument",
+        `The argument ${argumentName} isn't valid.`,
       ),
   },
 };
@@ -251,6 +286,11 @@ exports.activityPlannerCreateActivity = functions
         value: data?.requiresRAMS,
         rules: [RULES.defined, RULES.boolean],
       },
+      {
+        name: "category",
+        value: data?.category,
+        rules: [RULES.string, RULES.activityCategory],
+      },
     ];
 
     // Ensure all fields meet their rules
@@ -261,6 +301,7 @@ exports.activityPlannerCreateActivity = functions
       name: data.name,
       requiresAIF: data.requiresAIF,
       requiresRAMS: data.requiresRAMS,
+      category: data.category,
       description: "",
       location: "",
       scoutGroup: "",
@@ -271,6 +312,7 @@ exports.activityPlannerCreateActivity = functions
       endTime: "",
       peopleByUID: { [context.auth.uid]: "Editor" },
       peopleByEmail: {},
+      numbers: {},
       activityLeader: {},
       contact: {},
     };
@@ -307,7 +349,7 @@ exports.activityOverviewGet = functions
 
     // Prepare neccessary data
     const returnData = Object.fromEntries(
-      ["name", "requiresAIF", "requiresRAMS", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "activityLeader", "contact"].map(
+      ["name", "requiresAIF", "requiresRAMS", "category", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "numbers", "activityLeader", "contact"].map(
         (name) => [name, activity.data()[name]],
       ),
     );
@@ -337,12 +379,17 @@ exports.activityOverviewSet = functions
       {
         name: "requiresAIF",
         value: data?.requiresAIF,
-        rules: [RULES.boolean, RULES.true],
+        rules: [RULES.boolean],
       },
       {
         name: "requiresRAMS",
         value: data?.requiresRAMS,
-        rules: [RULES.boolean, RULES.true],
+        rules: [RULES.boolean],
+      },
+      {
+        name: "category",
+        value: data?.category,
+        rules: [RULES.string, RULES.activityCategory],
       },
       {
         name: "description",
@@ -383,6 +430,46 @@ exports.activityOverviewSet = functions
         name: "endTime",
         value: data?.endTime,
         rules: [RULES.string],
+      },
+      {
+        name: "numbers.keas",
+        value: data["numbers.keas"],
+        rules: [RULES.integer],
+      },
+      {
+        name: "numbers.cubs",
+        value: data["numbers.cubs"],
+        rules: [RULES.integer],
+      },
+      {
+        name: "numbers.scouts",
+        value: data["numbers.scouts"],
+        rules: [RULES.integer],
+      },
+      {
+        name: "numbers.venturers",
+        value: data["numbers.venturers"],
+        rules: [RULES.integer],
+      },
+      {
+        name: "numbers.rovers",
+        value: data["numbers.rovers"],
+        rules: [RULES.integer],
+      },
+      {
+        name: "numbers.leaders",
+        value: data["numbers.leaders"],
+        rules: [RULES.integer],
+      },
+      {
+        name: "numbers.others",
+        value: data["numbers.others"],
+        rules: [RULES.integer],
+      },
+      {
+        name: "numbers.others",
+        value: data["numbers.others"],
+        rules: [RULES.integer],
       },
       {
         name: "activityLeader.name",

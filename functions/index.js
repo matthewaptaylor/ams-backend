@@ -356,6 +356,8 @@ exports.activityOverviewGet = functions
 
     // Include the current user's role
     returnData.role = activity.data().peopleByUID[context.auth.uid];
+    returnData.activityLeaderUID = Object.entries(activity.data().peopleByUID)
+      .find((person) => person[1] == "Activity Leader")?.[0];
 
     return returnData;
   });
@@ -479,7 +481,7 @@ exports.activityOverviewSet = functions
       {
         name: "activityLeader.age",
         value: data["activityLeader.age"],
-        rules: [RULES.string],
+        rules: [RULES.integer],
       },
       {
         name: "activityLeader.home",
@@ -557,6 +559,15 @@ exports.activityOverviewSet = functions
     );
 
     delete documentTemplate.undefined;
+
+    // Prevent if non activity leader is updating the activity leader information
+    if (Object.keys(documentTemplate).some((key) => key.slice(0, 14) === "activityLeader") &&
+      activity.data().peopleByUID[context.auth.uid] !== "Activity Leader") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Only the Activity Leader can change this.",
+      );
+    }
 
     // Enforce required for name if exists
     if ("name" in documentTemplate && !documentTemplate.name.trim()) {
@@ -955,4 +966,128 @@ exports.activityRAMSDelete = functions
       .doc(data.id).collection("risks").doc(data.riskId).delete();
 
     return { id: data.riskId };
+  });
+
+exports.userCreated = functions.auth.user().onCreate(async (user) => {
+  // Add user document to database
+  await admin
+    .firestore()
+    .collection("users")
+    .doc(user.uid)
+    .set({
+      birthDate: "",
+      home: "",
+      work: "",
+      cell: "",
+      address: "",
+      contact: {},
+    });
+});
+
+// Gets the overview data of an activity
+exports.userGet = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
+
+    // Get activity
+    const activity = await admin
+      .firestore()
+      .collection("users")
+      .doc(context.auth.uid)
+      .get();
+
+    // Prepare neccessary data
+    const returnData = Object.fromEntries(
+      ["birthDate", "home", "work", "cell", "address", "contact"].map(
+        (name) => [name, activity.data()[name]],
+      ),
+    );
+
+    return returnData;
+  });
+
+// Sets overview data for an activity
+exports.userUpdate = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+
+    // Check arguments
+    const fields = [
+      {
+        name: "birthDate",
+        value: data?.birthDate,
+        rules: [RULES.string],
+      },
+      {
+        name: "home",
+        value: data?.home,
+        rules: [RULES.string],
+      },
+      {
+        name: "work",
+        value: data?.work,
+        rules: [RULES.string],
+      },
+      {
+        name: "cell",
+        value: data?.cell,
+        rules: [RULES.string],
+      },
+      {
+        name: "address",
+        value: data?.address,
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.name",
+        value: data["contact.name"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.home",
+        value: data["contact.home"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.work",
+        value: data["contact.work"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.cell",
+        value: data["contact.cell"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.address",
+        value: data["contact.address"],
+        rules: [RULES.string],
+      },
+    ];
+    checkRules(fields);
+
+    // Sort out data to write to firestore
+    const documentTemplate = Object.fromEntries(
+      fields.map((field) =>
+        field.value === undefined ? [] : [field.name, field.value],
+      ),
+    );
+
+    delete documentTemplate.undefined;
+
+    console.log(documentTemplate);
+
+    // Set data
+    await admin
+      .firestore()
+      .collection("users")
+      .doc(context.auth.uid)
+      .update(documentTemplate);
+
+    return true;
   });

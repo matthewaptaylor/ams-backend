@@ -526,6 +526,16 @@ exports.activityOverviewSet = functions
         value: data["contact.address"],
         rules: [RULES.string],
       },
+      {
+        name: "contact.time",
+        value: data["contact.time"],
+        rules: [RULES.string],
+      },
+      {
+        name: "contact.date",
+        value: data["contact.date"],
+        rules: [RULES.string],
+      },
     ];
     checkRules(fields);
 

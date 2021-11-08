@@ -34,7 +34,7 @@ const existError = (type, id) =>
 const accessError = () =>
   new functions.https.HttpsError(
     "unauthenticated",
-    "Sorry, you do not have access to this activity. If you previously did, somebody probably removed your access.",
+    "Sorry, you do not have the right permissions to do this. If you previously did, somebody probably changed your access.",
   );
 
 // Rules
@@ -315,6 +315,7 @@ exports.activityPlannerCreateActivity = functions
       numbers: {},
       activityLeader: {},
       contact: {},
+      signatures: {},
     };
 
     // Add document to database
@@ -349,7 +350,7 @@ exports.activityOverviewGet = functions
 
     // Prepare neccessary data
     const returnData = Object.fromEntries(
-      ["name", "requiresAIF", "requiresRAMS", "category", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "numbers", "activityLeader", "contact"].map(
+      ["name", "requiresAIF", "requiresRAMS", "category", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "numbers", "activityLeader", "contact", "signatures"].map(
         (name) => [name, activity.data()[name]],
       ),
     );
@@ -966,6 +967,104 @@ exports.activityRAMSDelete = functions
       .doc(data.id).collection("risks").doc(data.riskId).delete();
 
     return { id: data.riskId };
+  });
+
+// Sets overview data for an activity
+exports.activitySignatureSet = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data.id) throw existError("activity", data.id); // Ensure activity id is given
+
+    // Check arguments
+    const fields = [
+      {
+        name: "role",
+        value: data?.role,
+        rules: [RULES.defined, RULES.string, {
+          condition: (v) => v == null || ["Activity Leader", "Section Leader", "Group Leader"].includes(v),
+          exception: (argumentName) =>
+            new functions.https.HttpsError(
+              "invalid-argument",
+              `The argument ${argumentName} is not a valid role.`,
+            ),
+        }],
+      },
+      {
+        name: "signature",
+        value: data?.signature,
+        rules: [RULES.defined, RULES.array, {
+          condition: (v) => {
+            if (v == null) return true;
+
+            if (v.length == 0) return false;
+
+            v.forEach((line) => {
+              if (!(v instanceof Object) || !Array.isArray(v)) return false;
+
+              const lineArray = Object.values(line);
+
+              if (!Array.isArray(lineArray)) return false;
+              if (lineArray.length == 0) return false;
+
+              lineArray.forEach((point) => {
+                if (!Array.isArray(point)) return false;
+                if (point.length != 3) return false;
+
+                point.forEach((point) => {
+                  if (!Number.isInteger(point)) return false;
+                });
+              });
+            });
+
+            return true;
+          },
+          exception: (argumentName) =>
+            new functions.https.HttpsError(
+              "invalid-argument",
+              `The argument ${argumentName} is not valid.`,
+            ),
+        }],
+      },
+    ];
+    checkRules(fields);
+
+    // Check activity
+    const activity = await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .get();
+
+    if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+
+    // Prevent if non activity leader is updating the activity leader information
+    if (data.role === "Activity Leader" &&
+      activity.data().peopleByUID[context.auth.uid] !== "Activity Leader") {
+      throw accessError();
+    }
+
+
+    // Sort out data to write to firestore
+    const documentTemplate = {
+      [`signatures.${data.role}.name`]: context.auth.token.name,
+      [`signatures.${data.role}.email`]: context.auth.token.email,
+      [`signatures.${data.role}.date`]: new Date().toISOString().slice(0, 10),
+      [`signatures.${data.role}.uid`]: context.auth.uid,
+      [`signatures.${data.role}.signature`]: data.signature,
+    };
+
+    // Set data
+    await admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id)
+      .update(documentTemplate);
+
+    return true;
   });
 
 exports.userCreated = functions.auth.user().onCreate(async (user) => {

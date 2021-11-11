@@ -1190,3 +1190,121 @@ exports.userUpdate = functions
 
     return true;
   });
+
+
+exports.activityTableGet = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data?.id) throw existError("activity", data.id); // Ensure activity id is given
+    if (!data?.tableId || !["route", "emergencyRoute"].includes(data.tableId)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "The argument tableId is not a valid table.",
+      );
+    }
+
+    // Get activity
+    const activityRef = admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id);
+    const activity = await activityRef.get();
+
+    if (!activity.exists) throw existError("activity", data.id); // Check activity exists
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+
+    // Set tables
+    const table = await activityRef.collection("tables").doc(data.tableId).get();
+
+    return table.data();
+  });
+
+// Sets overview data for an activity
+exports.activityTableSet = functions
+  .region("australia-southeast1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw authenticationError(); // Ensure user is authenticated
+    if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
+    if (!data) throw parametersError(); // Ensure parameters have been provided
+    if (!data.id) throw existError("activity", data.id); // Ensure activity id is given
+
+    // Check arguments
+    const tableRules = { route: [[RULES.string], [RULES.string], [RULES.string]], emergencyRoute: [[RULES.string], [RULES.string], [RULES.string]] };
+
+    const params = [
+      {
+        name: "tableId",
+        value: data?.tableId,
+        rules: [RULES.defined, {
+          condition: (v) => v == null || Object.keys(tableRules).includes(v),
+          exception: (argumentName) =>
+            new functions.https.HttpsError(
+              "invalid-argument",
+              `The argument ${argumentName} is not a valid table.`,
+            ),
+        }],
+      },
+      {
+        name: "rowChanges",
+        value: data?.rowChanges,
+        rules: [RULES.defined, RULES.object, {
+          condition: (v) => v == null || Object.values(v).every((vItem) => Array.isArray(vItem)),
+          exception: (argumentName) =>
+            new functions.https.HttpsError(
+              "invalid-argument",
+              `A value of ${argumentName} is not an array.`,
+            ),
+        }],
+      },
+      {
+        name: "removedRows",
+        value: data?.removedRows,
+        rules: [RULES.defined, RULES.array],
+      },
+    ];
+    checkRules(params);
+
+    // Check each row
+    const rules = tableRules[data.tableId];
+    Object.entries(data.rowChanges).forEach(([index, row]) => {
+      if (row.length !== rules.length) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          `Row ${index} is not the correct length.`,
+        );
+      }
+
+      // Check each column for respective rule
+      row.forEach((column, index) => {
+        (rules[index] ?? []).forEach((rule) => {
+          // Check each rule in each field
+          if (!rule.condition(column)) throw rule.exception(`${data.tableId} column`);
+        });
+      });
+    });
+
+    // Prepare data to write to firestore
+    const rowsTemplate = data.rowChanges;
+    data.removedRows.forEach((row) => {
+      rowsTemplate[row] = admin.firestore.FieldValue.delete();
+    });
+
+    // Check activity
+    const activityRef = admin
+      .firestore()
+      .collection("activities")
+      .doc(data.id);
+    const activity = await activityRef.get();
+
+    if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
+    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+
+    // Set tables
+    const tableRef = activityRef.collection("tables").doc(data.tableId);
+    await tableRef.set({ rows: rowsTemplate }, { merge: true });
+
+    return true;
+  });

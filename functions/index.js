@@ -1199,7 +1199,7 @@ exports.activityTableGet = functions
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
     if (!data?.id) throw existError("activity", data.id); // Ensure activity id is given
-    if (!data?.tableId || !["route", "emergencyRoute"].includes(data.tableId)) {
+    if (!data?.tableId || !["plan", "route", "emergencyRoute"].includes(data.tableId)) {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The argument tableId is not a valid table.",
@@ -1232,7 +1232,11 @@ exports.activityTableSet = functions
     if (!data.id) throw existError("activity", data.id); // Ensure activity id is given
 
     // Check arguments
-    const tableRules = { route: [[RULES.string], [RULES.string], [RULES.string]], emergencyRoute: [[RULES.string], [RULES.string], [RULES.string]] };
+    const tableRules = {
+      plan: [[RULES.string], [RULES.string], [RULES.string], [RULES.string], [RULES.string]],
+      route: [[RULES.string], [RULES.string], [RULES.string]],
+      emergencyRoute: [[RULES.string], [RULES.string], [RULES.string]],
+    };
 
     const params = [
       {

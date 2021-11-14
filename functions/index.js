@@ -212,8 +212,11 @@ exports.activityPlannerGetActivities = functions
     const email = context.auth.token.email;
 
     // Database path of records
-    const emailPath = `peopleByEmail.${email.replace(/\./g, "&period;")}`;
+    const emailSub = email.replace(/\./g, "&period;");
+    const emailPath = `peopleByEmail.${emailSub}`;
     const uidPath = `peopleByUID.${uid}`;
+
+    const reallocated = [];
 
     if (context.auth.token.email_verified) {
       // If verified, check any peopleByEmail records exist
@@ -237,8 +240,14 @@ exports.activityPlannerGetActivities = functions
             .doc(activity.id)
             .update({
               [emailPath]: admin.firestore.FieldValue.delete(),
-              [uidPath]: activity.data().peopleByEmail[email],
+              [uidPath]: activity.data().peopleByEmail[emailSub],
             });
+
+          reallocated.push({
+            id: activity.id,
+            name: activity.data().name,
+            role: activity.data().peopleByEmail[emailSub],
+          });
         },
       );
     }
@@ -255,11 +264,11 @@ exports.activityPlannerGetActivities = functions
       ])
       .get();
 
-    return activities.docs.map((activity) => ({
+    return [...activities.docs.map((activity) => ({
       id: activity.id,
       name: activity.data().name,
       role: activity.data().peopleByUID[uid],
-    }));
+    })), ...reallocated];
   });
 
 exports.activityPlannerCreateActivity = functions

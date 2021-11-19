@@ -165,7 +165,7 @@ const checkRules = (fields, preventException = false) => {
 /**
  * Sends an email
  */
-const sendEmail = async (to, subject, message) => {
+const sendEmail = async (to, replyTo, subject, message) => {
   // Initialise connection
   const oauth2Client = new OAuth2(
     functions.config().gmail.clientid,
@@ -195,10 +195,11 @@ const sendEmail = async (to, subject, message) => {
 
   return transporter.sendMail({
     to: to,
+    from: `"Activity Management System - Scouts Aotearoa" <${functions.config().gmail.user}>`,
+    replyTo: `"${replyTo.name}" <${replyTo.email}>`,
     subject: subject,
     text: message.join("\n\n"),
     html: template,
-    from: `"Activity Management System - Scouts Aotearoa" <${functions.config().gmail.user}>`,
   });
 };
 
@@ -355,7 +356,25 @@ exports.activityOverviewGet = functions
     if (!activity.exists) throw existError("activity", data.id); // Check activity exists
 
     // Check user has access to activity
-    if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError();
+    if (!(context.auth.uid in activity.data().peopleByUID)) {
+      const email = context.auth.token.email;
+      const emailSub = email.replace(/\./g, "&period;");
+      const emailPath = `peopleByEmail.${emailSub}`;
+      const uidPath = `peopleByUID.${context.auth.uid}`;
+
+      if (emailSub in activity.data().peopleByEmail) {
+        // Give user access by UID
+        await admin.firestore()
+          .collection("activities")
+          .doc(activity.id)
+          .update({
+            [emailPath]: admin.firestore.FieldValue.delete(),
+            [uidPath]: activity.data().peopleByEmail[emailSub],
+          });
+      } else {
+        throw accessError();
+      }
+    }
 
     // Prepare neccessary data
     const returnData = Object.fromEntries(
@@ -757,14 +776,15 @@ exports.activityPeopleUpdate = functions
     if (data.role && users.users[0]?.uid !== context.auth.uid) {
       // Changed another user's role, not deleted
       const messageText = [
-        `Hi, ${users.users[0]?.displayName ?? data.email}.`,
-        `You have been assigned to the role of ${data.role} for the activity ${activity.data().name}. You can find this activity here:`,
+        `Hi ${users.users[0]?.displayName ?? data.email},`,
+        `${context.auth.token.name} (${context.auth.token.email}) has assigned you to the role of ${data.role} for the activity ${activity.data().name}. You can find this activity here:`,
         `https://ams.matthewtaylor.codes/activity/${data.id}/people`,
         "Ngā mihi.",
       ];
 
       sendEmail(
         data.email,
+        { name: context.auth.token.name, email: context.auth.token.email },
         `Your role of ${data.role} for ${activity.data().name}`,
         messageText,
       );

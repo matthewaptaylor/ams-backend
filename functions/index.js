@@ -63,6 +63,14 @@ const RULES = {
         `The argument ${argumentName} is not a number.`,
       ),
   },
+  numberOrBlank: {
+    condition: (v) => v == null || typeof v === "number" || v === "",
+    exception: (argumentName) =>
+      new functions.https.HttpsError(
+        "invalid-argument",
+        `The argument ${argumentName} is not a number.`,
+      ),
+  },
   integer: {
     condition: (v) => v == null || Number.isInteger(v),
     exception: (argumentName) =>
@@ -1228,7 +1236,7 @@ exports.activityTableGet = functions
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
     if (!data?.id) throw existError("activity", data.id); // Ensure activity id is given
-    if (!data?.tableId || !["plan", "route", "emergencyRoute"].includes(data.tableId)) {
+    if (!data?.tableId || !["plan", "budget", "route", "emergencyRoute"].includes(data.tableId)) {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "The argument tableId is not a valid table.",
@@ -1263,6 +1271,7 @@ exports.activityTableSet = functions
     // Check arguments
     const tableRules = {
       plan: [[RULES.string], [RULES.string], [RULES.string], [RULES.string], [RULES.string]],
+      budget: [[RULES.string], [RULES.string], [RULES.numberOrBlank], [RULES.numberOrBlank]],
       route: [[RULES.string], [RULES.string], [RULES.string]],
       emergencyRoute: [[RULES.string], [RULES.string], [RULES.string]],
     };

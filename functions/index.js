@@ -211,6 +211,61 @@ const sendEmail = async (to, replyTo, subject, message) => {
   });
 };
 
+// Check every day for any reminder emails that need to be sent
+exports.reminderEmail = functions.region("australia-southeast1").pubsub.schedule("every 2 hours").timeZone("Pacific/Auckland").onRun((context) => {
+  console.log("Reminder email function activated, must be 6 am.");
+
+  [7, 14, 21, 28].forEach(async (days) => {
+    // Set up start date
+    const start = new Date();
+    start.setHours(0);
+    start.setMinutes(0);
+    start.setSeconds(0);
+    start.setDate(start.getDate() + days);
+
+    // Set up end date
+    const end = new Date();
+    end.setHours(23);
+    end.setMinutes(59);
+    end.setSeconds(59);
+    end.setDate(end.getDate() + days);
+
+    console.log("Dates", start, end);
+
+    // Get all activities that take place on the day
+    const activitiesToday = await admin.firestore().collection("activities")
+      .where("dateObject", ">=", start)
+      .where("dateObject", "<=", end)
+      .get();
+
+    console.log(`Days ahead: ${days}`);
+    activitiesToday.docs.forEach((activity) => console.log(activity.data().name));
+    activitiesToday.docs.forEach((activity) => {
+      console.log(activity.data().remindTimes, days.toString());
+      if (activity.data().remindEmails.length && activity.data().remindTimes.includes(days.toString())) {
+        // Send email
+        console.log("Email", activity.data().name);
+
+        // const messageText = [
+        //   "Hi,",
+        //   `The activity ${activity.data().name} takes place in ${days} days. You're signed up to receive reminder emails for this paperwork - please make sure it is completed and sent in on time. You can find this activity here:`,
+        //   `https://ams.matthewtaylor.codes/activity/${activity.id}/people`,
+        //   "Ngā mihi.",
+        // ];
+
+        // sendEmail(
+        //   activity.data().remindEmails,
+        //   { name: "Activity Management System - Scouts Aotearoa", email: functions.config().gmail.user },
+        //   `Paperwork reminder for ${activity.data().name}`,
+        //   messageText,
+        // );
+      }
+    });
+  });
+
+  return null;
+});
+
 exports.activityPlannerGetActivities = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
@@ -334,6 +389,9 @@ exports.activityPlannerCreateActivity = functions
       activityLeader: {},
       contact: {},
       signatures: {},
+      remindEmails: [],
+      remindTimes: [],
+      dateObject: null,
     };
 
     // Add document to database
@@ -386,7 +444,7 @@ exports.activityOverviewGet = functions
 
     // Prepare neccessary data
     const returnData = Object.fromEntries(
-      ["name", "requiresAIF", "requiresRAMS", "category", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "numbers", "activityLeader", "contact", "signatures"].map(
+      ["name", "requiresAIF", "requiresRAMS", "category", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "numbers", "activityLeader", "contact", "signatures", "remindEmails", "remindTimes"].map(
         (name) => [name, activity.data()[name]],
       ),
     );
@@ -575,6 +633,30 @@ exports.activityOverviewSet = functions
         value: data["contact.date"],
         rules: [RULES.string],
       },
+      {
+        name: "remindEmails",
+        value: data?.remindEmails,
+        rules: [RULES.array, {
+          condition: (v) => v == null || v.every((item) => /.+@.+/.test(item)),
+          exception: (argumentName) =>
+            new functions.https.HttpsError(
+              "invalid-argument",
+              `The argument ${argumentName} must contain emails.`,
+            ),
+        }],
+      },
+      {
+        name: "remindTimes",
+        value: data?.remindTimes,
+        rules: [RULES.array, {
+          condition: (v) => v == null || v.every((item) => ["7", "14", "21", "28"].includes(item)),
+          exception: (argumentName) =>
+            new functions.https.HttpsError(
+              "invalid-argument",
+              `The argument ${argumentName} is not a valid option.`,
+            ),
+        }],
+      },
     ];
     checkRules(fields);
 
@@ -616,6 +698,11 @@ exports.activityOverviewSet = functions
     // Enforce required for name if exists
     if ("name" in documentTemplate && !documentTemplate.name.trim()) {
       throw RULES.defined.exception("name");
+    }
+
+    // Add dateObject if startDate set
+    if ("startDate" in documentTemplate) {
+      documentTemplate.dateObject = Number.isNaN(Date.parse(documentTemplate.startDate)) ? null : new Date(documentTemplate.startDate);
     }
 
     console.log(documentTemplate);

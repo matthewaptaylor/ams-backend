@@ -587,6 +587,13 @@ exports.activityOverviewSet = functions
 
     if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+    // Prevent viewer from writing
+    if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "You do not have editing permissions for this activity.",
+      );
+    }
 
     // Sort out data to write to firestore
     const documentTemplate = Object.fromEntries(
@@ -729,6 +736,13 @@ exports.activityPeopleUpdate = functions
 
     if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+    // Prevent viewer from writing
+    if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "You do not have editing permissions for this activity.",
+      );
+    }
 
     // Get user information
     const users = await admin.auth().getUsers([{ email: data.email }]);
@@ -882,7 +896,16 @@ exports.activityRAMSUpdate = functions
           {
             condition: (v) =>
               v == null ||
-              ["People", "Environment", "Equipment"].includes(v),
+              [
+                "Behaviour",
+                "Environment",
+                "Equipment",
+                "Fire",
+                "People",
+                "Sickness/Medical",
+                "Theft",
+                "Water",
+              ].includes(v),
             exception: (argumentName) =>
               new functions.https.HttpsError(
                 "invalid-argument",
@@ -958,6 +981,13 @@ exports.activityRAMSUpdate = functions
 
     if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+    // Prevent viewer from writing
+    if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "You do not have editing permissions for this activity.",
+      );
+    }
 
     // Sort out data to write to firestore
     const documentTemplate = Object.fromEntries(
@@ -996,6 +1026,13 @@ exports.activityRAMSDelete = functions
 
     if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+    // Prevent viewer from writing
+    if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "You do not have editing permissions for this activity.",
+      );
+    }
 
     // Set data
     await admin
@@ -1077,6 +1114,13 @@ exports.activitySignatureSet = functions
 
     if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+    // Prevent viewer from writing
+    if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "You do not have editing permissions for this activity.",
+      );
+    }
 
     // Prevent if non activity leader is updating the activity leader information
     if (data.role === "Activity Leader" &&
@@ -1343,6 +1387,13 @@ exports.activityTableSet = functions
 
     if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
+    // Prevent viewer from writing
+    if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "You do not have editing permissions for this activity.",
+      );
+    }
 
     // Set tables
     const tableRef = activityRef.collection("tables").doc(data.tableId);

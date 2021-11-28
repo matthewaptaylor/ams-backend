@@ -212,23 +212,25 @@ const sendEmail = async (to, replyTo, subject, message) => {
 };
 
 // Check every day for any reminder emails that need to be sent
-exports.reminderEmail = functions.region("australia-southeast1").pubsub.schedule("every 2 hours").timeZone("Pacific/Auckland").onRun((context) => {
+exports.reminderEmail = functions.region("australia-southeast1").pubsub.schedule("every day 06:00").timeZone("Pacific/Auckland").onRun((context) => {
   console.log("Reminder email function activated, must be 6 am.");
 
   [7, 14, 21, 28].forEach(async (days) => {
-    // Set up start date
+    // Set up start date adjusted for GMT+12
     const start = new Date();
-    start.setHours(0);
-    start.setMinutes(0);
-    start.setSeconds(0);
+    start.setUTCHours(12);
+    start.setUTCMinutes(0);
+    start.setUTCSeconds(0);
+    start.setUTCMilliseconds(0);
     start.setDate(start.getDate() + days);
 
     // Set up end date
     const end = new Date();
-    end.setHours(23);
-    end.setMinutes(59);
-    end.setSeconds(59);
-    end.setDate(end.getDate() + days);
+    end.setUTCHours(11);
+    end.setUTCMinutes(59);
+    end.setUTCSeconds(59);
+    end.setUTCMilliseconds(999);
+    end.setDate(end.getDate() + days + 1);
 
     console.log("Dates", start, end);
 
@@ -246,19 +248,19 @@ exports.reminderEmail = functions.region("australia-southeast1").pubsub.schedule
         // Send email
         console.log("Email", activity.data().name);
 
-        // const messageText = [
-        //   "Hi,",
-        //   `The activity ${activity.data().name} takes place in ${days} days. You're signed up to receive reminder emails for this paperwork - please make sure it is completed and sent in on time. You can find this activity here:`,
-        //   `https://ams.matthewtaylor.codes/activity/${activity.id}/people`,
-        //   "Ngā mihi.",
-        // ];
+        const messageText = [
+          "Hi,",
+          `The activity ${activity.data().name} takes place in ${days} days. You're signed up to receive reminder emails for this paperwork - please make sure it is completed and sent in on time. You can find this activity here:`,
+          `https://ams.matthewtaylor.codes/activity/${activity.id}/people`,
+          "Ngā mihi.",
+        ];
 
-        // sendEmail(
-        //   activity.data().remindEmails,
-        //   { name: "Activity Management System - Scouts Aotearoa", email: functions.config().gmail.user },
-        //   `Paperwork reminder for ${activity.data().name}`,
-        //   messageText,
-        // );
+        sendEmail(
+          activity.data().remindEmails,
+          { name: "Activity Management System - Scouts Aotearoa", email: functions.config().gmail.user },
+          `Paperwork reminder for ${activity.data().name}`,
+          messageText,
+        );
       }
     });
   });

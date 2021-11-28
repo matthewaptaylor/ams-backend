@@ -1219,10 +1219,13 @@ exports.activitySignatureSet = functions
 
 
     // Sort out data to write to firestore
+    const now = new Date();
+    now.setHours(now.getHours() + 12);
+
     const documentTemplate = {
       [`signatures.${data.role}.name`]: context.auth.token.name,
       [`signatures.${data.role}.email`]: context.auth.token.email,
-      [`signatures.${data.role}.date`]: new Date().toISOString().slice(0, 10),
+      [`signatures.${data.role}.date`]: now.toISOString().slice(0, 10),
       [`signatures.${data.role}.uid`]: context.auth.uid,
       [`signatures.${data.role}.signature`]: data.signature,
     };

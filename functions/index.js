@@ -251,7 +251,7 @@ exports.reminderEmail = functions.region("australia-southeast1").pubsub.schedule
         const messageText = [
           "Hi,",
           `The activity ${activity.data().name} takes place in ${days} days. You're signed up to receive reminder emails for this paperwork - please make sure it is completed and sent in on time. You can find this activity here:`,
-          `https://ams.matthewtaylor.codes/activity/${activity.id}/people`,
+          `https://ams-scouts-aotearoa.web.app/activity/${activity.id}/people`,
           "Ngā mihi.",
         ];
 

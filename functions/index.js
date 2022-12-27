@@ -14,27 +14,27 @@ const OAuth2 = google.auth.OAuth2;
 const authenticationError = () =>
   new functions.https.HttpsError(
     "unauthenticated",
-    "Sorry, we need you to be signed in to do this.",
+    "Sorry, we need you to be signed in to do this."
   );
 const verifiedError = () =>
   new functions.https.HttpsError(
     "unauthenticated",
-    "Sorry, to ensure privacy we need to verify your email before you can do this.",
+    "Sorry, to ensure privacy we need to verify your email before you can do this."
   );
 const parametersError = (id) =>
   new functions.https.HttpsError(
     "invalid-argument",
-    "Sorry, no parameters were provided to the server.",
+    "Sorry, no parameters were provided to the server."
   );
 const existError = (type, id) =>
   new functions.https.HttpsError(
     "invalid-argument",
-    `Sorry, the ${type} (ID: ${id}) doesn't exist. It might've been deleted.`,
+    `Sorry, the ${type} (ID: ${id}) doesn't exist. It might've been deleted.`
   );
 const accessError = () =>
   new functions.https.HttpsError(
     "unauthenticated",
-    "Sorry, you do not have the right permissions to do this. If you previously did, somebody probably changed your access.",
+    "Sorry, you do not have the right permissions to do this. If you previously did, somebody probably changed your access."
   );
 
 // Rules
@@ -44,7 +44,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is undefined.`,
+        `The argument ${argumentName} is undefined.`
       ),
   },
   string: {
@@ -52,7 +52,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not a string.`,
+        `The argument ${argumentName} is not a string.`
       ),
   },
   number: {
@@ -60,7 +60,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not a number.`,
+        `The argument ${argumentName} is not a number.`
       ),
   },
   numberOrBlank: {
@@ -68,7 +68,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not a number.`,
+        `The argument ${argumentName} is not a number.`
       ),
   },
   integer: {
@@ -76,7 +76,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not an integer.`,
+        `The argument ${argumentName} is not an integer.`
       ),
   },
   boolean: {
@@ -84,7 +84,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not a boolean.`,
+        `The argument ${argumentName} is not a boolean.`
       ),
   },
   true: {
@@ -92,7 +92,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} must be true.`,
+        `The argument ${argumentName} must be true.`
       ),
   },
   array: {
@@ -100,7 +100,7 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not an array.`,
+        `The argument ${argumentName} is not an array.`
       ),
   },
   object: {
@@ -108,34 +108,36 @@ const RULES = {
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} is not an object.`,
+        `The argument ${argumentName} is not an object.`
       ),
   },
   activityCategory: {
-    condition: (v) => v == null || [
-      "Group event",
-      "Zone event",
-      "Region event",
-      "National event",
-      "Picnic",
-      "Walk",
-      "Visit to town",
-      "Visit a Group",
-      "Other A",
-      "Abseiling",
-      "Air activity",
-      "Camping",
-      "Caving",
-      "Day hike",
-      "Patrol activity",
-      "Tramping",
-      "Water activity",
-      "Other B",
-    ].includes(v),
+    condition: (v) =>
+      v == null ||
+      [
+        "Group event",
+        "Zone event",
+        "Region event",
+        "National event",
+        "Picnic",
+        "Walk",
+        "Visit to town",
+        "Visit a Group",
+        "Other A",
+        "Abseiling",
+        "Air activity",
+        "Camping",
+        "Caving",
+        "Day hike",
+        "Patrol activity",
+        "Tramping",
+        "Water activity",
+        "Other B",
+      ].includes(v),
     exception: (argumentName) =>
       new functions.https.HttpsError(
         "invalid-argument",
-        `The argument ${argumentName} isn't valid.`,
+        `The argument ${argumentName} isn't valid.`
       ),
   },
 };
@@ -178,7 +180,7 @@ const sendEmail = async (to, replyTo, subject, message) => {
   const oauth2Client = new OAuth2(
     functions.config().gmail.clientid,
     functions.config().gmail.clientsecret,
-    "https://developers.google.com/oauthplayground",
+    "https://developers.google.com/oauthplayground"
   );
   oauth2Client.setCredentials({
     refresh_token: functions.config().gmail.refreshtoken,
@@ -197,13 +199,15 @@ const sendEmail = async (to, replyTo, subject, message) => {
   });
 
   // Format message
-  const template = `<!DOCTYPE html> <html lang="en"> <head> <meta content="width=device-width" name="viewport"> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"> <title>AMS - Scouts Aotearoa</title> <style> @media all { .ExternalClass { width: 100%; } .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div { line-height: 100%; } .apple-link a { color: inherit !important; font-family: inherit !important; font-size: inherit !important; font-weight: inherit !important; line-height: inherit !important; text-decoration: none !important; } #MessageViewBody a { color: inherit; text-decoration: none; font-size: inherit; font-family: inherit; font-weight: inherit; line-height: inherit; } } </style> </head> <body style="background: #fafafa;margin: 0;padding: 1rem;font-family: Verdana, sans-serif;"> <table border="0" cellpadding="0" cellspacing="0" class="body" role="presentation" style="max-width: 30rem;width: 100%;margin: 0 auto;"> <tbody> <tr> <td style="background-color: #5f249f;padding: 1rem;border-radius: 0.5rem 0.5rem 0 0;"> <img src="https://ams.matthewtaylor.codes/img/email.png" alt="AMS - Scouts Aotearoa Logo" style="display: block;margin: 0 auto;font-weight: bold;width: 100%;max-width: 20rem;color: #ffffff;text-align: center;"> </td> </tr> <tr> <td style="background-color: #ffffff;padding: 1rem;border-radius: 0 0 0.5rem 0.5rem">
+  const template = `<!DOCTYPE html> <html lang="en"> <head> <meta content="width=device-width" name="viewport"> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"> <title>AMS - Scouts Aotearoa</title> <style> @media all { .ExternalClass { width: 100%; } .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div { line-height: 100%; } .apple-link a { color: inherit !important; font-family: inherit !important; font-size: inherit !important; font-weight: inherit !important; line-height: inherit !important; text-decoration: none !important; } #MessageViewBody a { color: inherit; text-decoration: none; font-size: inherit; font-family: inherit; font-weight: inherit; line-height: inherit; } } </style> </head> <body style="background: #fafafa;margin: 0;padding: 1rem;font-family: Verdana, sans-serif;"> <table border="0" cellpadding="0" cellspacing="0" class="body" role="presentation" style="max-width: 30rem;width: 100%;margin: 0 auto;"> <tbody> <tr> <td style="background-color: #5f249f;padding: 1rem;border-radius: 0.5rem 0.5rem 0 0;"> <img src="https://ams-scouts-aotearoa.web.app/img/email.png" alt="AMS - Scouts Aotearoa Logo" style="display: block;margin: 0 auto;font-weight: bold;width: 100%;max-width: 20rem;color: #ffffff;text-align: center;"> </td> </tr> <tr> <td style="background-color: #ffffff;padding: 1rem;border-radius: 0 0 0.5rem 0.5rem">
       <p>${message.join("</p> <p>")}</p>
     </td> </tr> <tr> <td style="padding: 1rem;text-align: center;font-size: 0.8rem;color: rgb(150, 150, 150);"> You received this email because of an action somebody took in AMS.<br> Scouts Aotearoa, 1 Kaiwharawhara Road, Kaiwharawhara, Wellington 6035, New Zealand. </td> </tr> </tbody> </table> </body></html>`;
 
   return transporter.sendMail({
     to: to,
-    from: `"Activity Management System - Scouts Aotearoa" <${functions.config().gmail.user}>`,
+    from: `"Activity Management System - Scouts Aotearoa" <${
+      functions.config().gmail.user
+    }>`,
     replyTo: `"${replyTo.name}" <${replyTo.email}>`,
     subject: subject,
     text: message.join("\n\n"),
@@ -212,61 +216,77 @@ const sendEmail = async (to, replyTo, subject, message) => {
 };
 
 // Check every day for any reminder emails that need to be sent
-exports.reminderEmail = functions.region("australia-southeast1").pubsub.schedule("every day 06:00").timeZone("Pacific/Auckland").onRun((context) => {
-  console.log("Reminder email function activated, must be 6 am.");
+exports.reminderEmail = functions
+  .region("australia-southeast1")
+  .pubsub.schedule("every day 06:00")
+  .timeZone("Pacific/Auckland")
+  .onRun((context) => {
+    console.log("Reminder email function activated, must be 6 am.");
 
-  [7, 14, 21, 28].forEach(async (days) => {
-    // Set up start date adjusted for GMT+12
-    const start = new Date();
-    start.setUTCHours(12);
-    start.setUTCMinutes(0);
-    start.setUTCSeconds(0);
-    start.setUTCMilliseconds(0);
-    start.setDate(start.getDate() + days);
+    [7, 14, 21, 28].forEach(async (days) => {
+      // Set up start date adjusted for GMT+12
+      const start = new Date();
+      start.setUTCHours(12);
+      start.setUTCMinutes(0);
+      start.setUTCSeconds(0);
+      start.setUTCMilliseconds(0);
+      start.setDate(start.getDate() + days);
 
-    // Set up end date
-    const end = new Date();
-    end.setUTCHours(11);
-    end.setUTCMinutes(59);
-    end.setUTCSeconds(59);
-    end.setUTCMilliseconds(999);
-    end.setDate(end.getDate() + days + 1);
+      // Set up end date
+      const end = new Date();
+      end.setUTCHours(11);
+      end.setUTCMinutes(59);
+      end.setUTCSeconds(59);
+      end.setUTCMilliseconds(999);
+      end.setDate(end.getDate() + days + 1);
 
-    console.log("Dates", start, end);
+      console.log("Dates", start, end);
 
-    // Get all activities that take place on the day
-    const activitiesToday = await admin.firestore().collection("activities")
-      .where("dateObject", ">=", start)
-      .where("dateObject", "<=", end)
-      .get();
+      // Get all activities that take place on the day
+      const activitiesToday = await admin
+        .firestore()
+        .collection("activities")
+        .where("dateObject", ">=", start)
+        .where("dateObject", "<=", end)
+        .get();
 
-    console.log(`Days ahead: ${days}`);
-    activitiesToday.docs.forEach((activity) => console.log(activity.data().name));
-    activitiesToday.docs.forEach((activity) => {
-      console.log(activity.data().remindTimes, days.toString());
-      if (activity.data().remindEmails.length && activity.data().remindTimes.includes(days.toString())) {
-        // Send email
-        console.log("Email", activity.data().name);
+      console.log(`Days ahead: ${days}`);
+      activitiesToday.docs.forEach((activity) =>
+        console.log(activity.data().name)
+      );
+      activitiesToday.docs.forEach((activity) => {
+        console.log(activity.data().remindTimes, days.toString());
+        if (
+          activity.data().remindEmails.length &&
+          activity.data().remindTimes.includes(days.toString())
+        ) {
+          // Send email
+          console.log("Email", activity.data().name);
 
-        const messageText = [
-          "Hi,",
-          `The activity ${activity.data().name} takes place in ${days} days. You're signed up to receive reminder emails for this paperwork - please make sure it is completed and sent in on time. You can find this activity here:`,
-          `https://ams-scouts-aotearoa.web.app/activity/${activity.id}/people`,
-          "Ngā mihi.",
-        ];
+          const messageText = [
+            "Hi,",
+            `The activity ${
+              activity.data().name
+            } takes place in ${days} days. You're signed up to receive reminder emails for this paperwork - please make sure it is completed and sent in on time. You can find this activity here:`,
+            `https://ams-scouts-aotearoa.web.app/activity/${activity.id}/people`,
+            "Ngā mihi.",
+          ];
 
-        sendEmail(
-          activity.data().remindEmails,
-          { name: "Activity Management System - Scouts Aotearoa", email: functions.config().gmail.user },
-          `Paperwork reminder for ${activity.data().name}`,
-          messageText,
-        );
-      }
+          sendEmail(
+            activity.data().remindEmails,
+            {
+              name: "Activity Management System - Scouts Aotearoa",
+              email: functions.config().gmail.user,
+            },
+            `Paperwork reminder for ${activity.data().name}`,
+            messageText
+          );
+        }
+      });
     });
-  });
 
-  return null;
-});
+    return null;
+  });
 
 exports.activityPlannerGetActivities = functions
   .region("australia-southeast1")
@@ -294,28 +314,28 @@ exports.activityPlannerGetActivities = functions
           "Activity Leader",
           "Assisting",
           "Editor",
-          "Viewer"],
-        ).get();
+          "Viewer",
+        ])
+        .get();
 
       // Activities that are assigned to the user by email, not UID
-      await emailActivities.docs.forEach(
-        async (activity) => {
-          // Switch peopleByEmail entry to peopleByUID
-          await admin.firestore()
-            .collection("activities")
-            .doc(activity.id)
-            .update({
-              [emailPath]: admin.firestore.FieldValue.delete(),
-              [uidPath]: activity.data().peopleByEmail[emailSub],
-            });
-
-          reallocated.push({
-            id: activity.id,
-            name: activity.data().name,
-            role: activity.data().peopleByEmail[emailSub],
+      await emailActivities.docs.forEach(async (activity) => {
+        // Switch peopleByEmail entry to peopleByUID
+        await admin
+          .firestore()
+          .collection("activities")
+          .doc(activity.id)
+          .update({
+            [emailPath]: admin.firestore.FieldValue.delete(),
+            [uidPath]: activity.data().peopleByEmail[emailSub],
           });
-        },
-      );
+
+        reallocated.push({
+          id: activity.id,
+          name: activity.data().name,
+          role: activity.data().peopleByEmail[emailSub],
+        });
+      });
     }
 
     // Get all activities assigned by UID
@@ -330,11 +350,14 @@ exports.activityPlannerGetActivities = functions
       ])
       .get();
 
-    return [...activities.docs.map((activity) => ({
-      id: activity.id,
-      name: activity.data().name,
-      role: activity.data().peopleByUID[uid],
-    })), ...reallocated];
+    return [
+      ...activities.docs.map((activity) => ({
+        id: activity.id,
+        name: activity.data().name,
+        role: activity.data().peopleByUID[uid],
+      })),
+      ...reallocated,
+    ];
   });
 
 exports.activityPlannerCreateActivity = functions
@@ -432,7 +455,8 @@ exports.activityOverviewGet = functions
 
       if (emailSub in activity.data().peopleByEmail) {
         // Give user access by UID
-        await admin.firestore()
+        await admin
+          .firestore()
           .collection("activities")
           .doc(activity.id)
           .update({
@@ -446,15 +470,33 @@ exports.activityOverviewGet = functions
 
     // Prepare neccessary data
     const returnData = Object.fromEntries(
-      ["name", "requiresAIF", "requiresRAMS", "category", "description", "location", "scoutGroup", "scoutZoneRegion", "startDate", "startTime", "endDate", "endTime", "numbers", "activityLeader", "contact", "signatures", "remindEmails", "remindTimes"].map(
-        (name) => [name, activity.data()[name]],
-      ),
+      [
+        "name",
+        "requiresAIF",
+        "requiresRAMS",
+        "category",
+        "description",
+        "location",
+        "scoutGroup",
+        "scoutZoneRegion",
+        "startDate",
+        "startTime",
+        "endDate",
+        "endTime",
+        "numbers",
+        "activityLeader",
+        "contact",
+        "signatures",
+        "remindEmails",
+        "remindTimes",
+      ].map((name) => [name, activity.data()[name]])
     );
 
     // Include the current user's role
     returnData.role = activity.data().peopleByUID[context.auth.uid];
-    returnData.activityLeaderUID = Object.entries(activity.data().peopleByUID)
-      .find((person) => person[1] == "Activity Leader")?.[0];
+    returnData.activityLeaderUID = Object.entries(
+      activity.data().peopleByUID
+    ).find((person) => person[1] == "Activity Leader")?.[0];
 
     return returnData;
   });
@@ -638,26 +680,35 @@ exports.activityOverviewSet = functions
       {
         name: "remindEmails",
         value: data?.remindEmails,
-        rules: [RULES.array, {
-          condition: (v) => v == null || v.every((item) => /.+@.+/.test(item)),
-          exception: (argumentName) =>
-            new functions.https.HttpsError(
-              "invalid-argument",
-              `The argument ${argumentName} must contain emails.`,
-            ),
-        }],
+        rules: [
+          RULES.array,
+          {
+            condition: (v) =>
+              v == null || v.every((item) => /.+@.+/.test(item)),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} must contain emails.`
+              ),
+          },
+        ],
       },
       {
         name: "remindTimes",
         value: data?.remindTimes,
-        rules: [RULES.array, {
-          condition: (v) => v == null || v.every((item) => ["7", "14", "21", "28"].includes(item)),
-          exception: (argumentName) =>
-            new functions.https.HttpsError(
-              "invalid-argument",
-              `The argument ${argumentName} is not a valid option.`,
-            ),
-        }],
+        rules: [
+          RULES.array,
+          {
+            condition: (v) =>
+              v == null ||
+              v.every((item) => ["7", "14", "21", "28"].includes(item)),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} is not a valid option.`
+              ),
+          },
+        ],
       },
     ];
     checkRules(fields);
@@ -675,25 +726,29 @@ exports.activityOverviewSet = functions
     if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "You do not have editing permissions for this activity.",
+        "You do not have editing permissions for this activity."
       );
     }
 
     // Sort out data to write to firestore
     const documentTemplate = Object.fromEntries(
       fields.map((field) =>
-        field.value === undefined ? [] : [field.name, field.value],
-      ),
+        field.value === undefined ? [] : [field.name, field.value]
+      )
     );
 
     delete documentTemplate.undefined;
 
     // Prevent if non activity leader is updating the activity leader information
-    if (Object.keys(documentTemplate).some((key) => key.slice(0, 14) === "activityLeader") &&
-      activity.data().peopleByUID[context.auth.uid] !== "Activity Leader") {
+    if (
+      Object.keys(documentTemplate).some(
+        (key) => key.slice(0, 14) === "activityLeader"
+      ) &&
+      activity.data().peopleByUID[context.auth.uid] !== "Activity Leader"
+    ) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Only the Activity Leader can change this.",
+        "Only the Activity Leader can change this."
       );
     }
 
@@ -704,7 +759,11 @@ exports.activityOverviewSet = functions
 
     // Add dateObject if startDate set
     if ("startDate" in documentTemplate) {
-      documentTemplate.dateObject = Number.isNaN(Date.parse(documentTemplate.startDate)) ? null : new Date(documentTemplate.startDate);
+      documentTemplate.dateObject = Number.isNaN(
+        Date.parse(documentTemplate.startDate)
+      )
+        ? null
+        : new Date(documentTemplate.startDate);
     }
 
     console.log(documentTemplate);
@@ -745,14 +804,14 @@ exports.activityPeopleGet = functions
       ["peopleByUID", "peopleByEmail"].map((name) => [
         name,
         activity.data()[name],
-      ]),
+      ])
     );
 
     // ,,Prepare user information
     const users = await admin
       .auth()
       .getUsers(
-        Object.keys(returnData.peopleByUID).map((uid) => ({ uid: uid })),
+        Object.keys(returnData.peopleByUID).map((uid) => ({ uid: uid }))
       );
 
     returnData.infoByUID = Object.fromEntries(
@@ -763,7 +822,7 @@ exports.activityPeopleGet = functions
           email: user.email,
           photoURL: user.photoURL,
         },
-      ]),
+      ])
     ); // {uid: ,,displayName, email, photoURL}}
 
     return returnData;
@@ -791,7 +850,7 @@ exports.activityPeopleUpdate = functions
             exception: (argumentName) =>
               new functions.https.HttpsError(
                 "invalid-argument",
-                `The argument ${argumentName} must be a valid email.`,
+                `The argument ${argumentName} must be a valid email.`
               ),
           },
         ],
@@ -808,7 +867,7 @@ exports.activityPeopleUpdate = functions
             exception: (argumentName) =>
               new functions.https.HttpsError(
                 "invalid-argument",
-                `The argument ${argumentName} is not valid.`,
+                `The argument ${argumentName} is not valid.`
               ),
           },
         ],
@@ -829,33 +888,33 @@ exports.activityPeopleUpdate = functions
     if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "You do not have editing permissions for this activity.",
+        "You do not have editing permissions for this activity."
       );
     }
 
     // Get user information
     const users = await admin.auth().getUsers([{ email: data.email }]);
 
-    const documentPath = users.users.length ?
-      ["peopleByUID", users.users[0].uid] :
-      ["peopleByEmail", data.email.replace(/\./g, "&period;")];
+    const documentPath = users.users.length
+      ? ["peopleByUID", users.users[0].uid]
+      : ["peopleByEmail", data.email.replace(/\./g, "&period;")];
 
     // Count people with editing access who currently have accounts
     if (
       documentPath[0] === "peopleByUID" &&
-        (data.role == null || data.role === "Viewer") &&
-        activity.data().peopleByUID[users.users[0].uid] !== "Viewer"
+      (data.role == null || data.role === "Viewer") &&
+      activity.data().peopleByUID[users.users[0].uid] !== "Viewer"
     ) {
       // Trying to delete person with current account with editing permissions
       const editingUsers = Object.values(activity.data().peopleByUID).filter(
-        (role) => ["Activity Leader", "Assisting", "Editor"].includes(role),
+        (role) => ["Activity Leader", "Assisting", "Editor"].includes(role)
       ).length;
 
       if (editingUsers <= 1) {
         // Only one person with current account
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "Sorry, at least one person with an AMS account must always have editor access or above.",
+          "Sorry, at least one person with an AMS account must always have editor access or above."
         );
       }
     }
@@ -864,12 +923,14 @@ exports.activityPeopleUpdate = functions
     if (
       data.role === "Activity Leader" &&
       (Object.values(activity.data().peopleByUID).includes("Activity Leader") ||
-      Object.values(activity.data().peopleByEmail).includes("Activity Leader"))
+        Object.values(activity.data().peopleByEmail).includes(
+          "Activity Leader"
+        ))
     ) {
       // Trying to make person activity leader
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Sorry, there is already an Activity Leader.",
+        "Sorry, there is already an Activity Leader."
       );
     }
 
@@ -880,7 +941,7 @@ exports.activityPeopleUpdate = functions
       .doc(data.id)
       .update(
         new admin.firestore.FieldPath(...documentPath),
-        data.role ?? admin.firestore.FieldValue.delete(),
+        data.role ?? admin.firestore.FieldValue.delete()
       );
 
     // Notify user of change
@@ -888,8 +949,12 @@ exports.activityPeopleUpdate = functions
       // Changed another user's role, not deleted
       const messageText = [
         `Hi ${users.users[0]?.displayName ?? data.email},`,
-        `${context.auth.token.name} (${context.auth.token.email}) has assigned you to the role of ${data.role} for the activity ${activity.data().name}. You can find this activity here:`,
-        `https://ams.matthewtaylor.codes/activity/${data.id}/people`,
+        `${context.auth.token.name} (${
+          context.auth.token.email
+        }) has assigned you to the role of ${data.role} for the activity ${
+          activity.data().name
+        }. You can find this activity here:`,
+        `https://ams-scouts-aotearoa.web.app/activity/${data.id}/people`,
         "Ngā mihi.",
       ];
 
@@ -897,7 +962,7 @@ exports.activityPeopleUpdate = functions
         data.email,
         { name: context.auth.token.name, email: context.auth.token.email },
         `Your role of ${data.role} for ${activity.data().name}`,
-        messageText,
+        messageText
       );
     }
 
@@ -939,7 +1004,6 @@ exports.activityRAMSGet = functions
       .doc(data.id)
       .get();
 
-
     if (!activity.exists) throw existError("activity", data.id); // Check activity exists
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // User has access
 
@@ -949,7 +1013,10 @@ exports.activityRAMSGet = functions
       risks = await admin
         .firestore()
         .collection("activities")
-        .doc(data.id).collection("risks").doc(data.riskId).get();
+        .doc(data.id)
+        .collection("risks")
+        .doc(data.riskId)
+        .get();
 
       if (!risks.exists) throw existError("risk", data.riskId); // Check risk exists
 
@@ -959,11 +1026,14 @@ exports.activityRAMSGet = functions
       risks = await admin
         .firestore()
         .collection("activities")
-        .doc(data.id).collection("risks")
+        .doc(data.id)
+        .collection("risks")
         .get();
 
       // Return all risks
-      return Object.fromEntries(risks.docs.map((risk) => [risk.id, risk.data()]));
+      return Object.fromEntries(
+        risks.docs.map((risk) => [risk.id, risk.data()])
+      );
     }
   });
 
@@ -981,7 +1051,9 @@ exports.activityRAMSUpdate = functions
       {
         name: "category",
         value: data?.category,
-        rules: [RULES.defined, RULES.string,
+        rules: [
+          RULES.defined,
+          RULES.string,
           {
             condition: (v) =>
               v == null ||
@@ -998,7 +1070,7 @@ exports.activityRAMSUpdate = functions
             exception: (argumentName) =>
               new functions.https.HttpsError(
                 "invalid-argument",
-                `The argument ${argumentName} is not valid.`,
+                `The argument ${argumentName} is not valid.`
               ),
           },
         ],
@@ -1026,32 +1098,50 @@ exports.activityRAMSUpdate = functions
       {
         name: "likelihood",
         value: data?.likelihood,
-        rules: [RULES.defined, RULES.string,
+        rules: [
+          RULES.defined,
+          RULES.string,
           {
             condition: (v) =>
               v == null ||
-              ["Almost certain", "Highly likely", "Likely", "Unlikely", "Remote"].includes(v),
+              [
+                "Almost certain",
+                "Highly likely",
+                "Likely",
+                "Unlikely",
+                "Remote",
+              ].includes(v),
             exception: (argumentName) =>
               new functions.https.HttpsError(
                 "invalid-argument",
-                `The argument ${argumentName} is not valid.`,
+                `The argument ${argumentName} is not valid.`
               ),
-          }],
+          },
+        ],
       },
       {
         name: "consequence",
         value: data?.consequence,
-        rules: [RULES.defined, RULES.string,
+        rules: [
+          RULES.defined,
+          RULES.string,
           {
             condition: (v) =>
               v == null ||
-              ["Catastrophic", "Major", "Serious", "Minor", "Negligible"].includes(v),
+              [
+                "Catastrophic",
+                "Major",
+                "Serious",
+                "Minor",
+                "Negligible",
+              ].includes(v),
             exception: (argumentName) =>
               new functions.https.HttpsError(
                 "invalid-argument",
-                `The argument ${argumentName} is not valid.`,
+                `The argument ${argumentName} is not valid.`
               ),
-          }],
+          },
+        ],
       },
       {
         name: "acceptable",
@@ -1074,24 +1164,25 @@ exports.activityRAMSUpdate = functions
     if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "You do not have editing permissions for this activity.",
+        "You do not have editing permissions for this activity."
       );
     }
 
     // Sort out data to write to firestore
     const documentTemplate = Object.fromEntries(
-      fields.map((field) => [field.name, field.value]),
+      fields.map((field) => [field.name, field.value])
     );
 
     // Set data
     const risks = admin
       .firestore()
       .collection("activities")
-      .doc(data.id).collection("risks");
+      .doc(data.id)
+      .collection("risks");
 
-    const newRisk = data.riskId ?
-      await risks.doc(data.riskId).set(documentTemplate) :
-      await risks.add(documentTemplate);
+    const newRisk = data.riskId
+      ? await risks.doc(data.riskId).set(documentTemplate)
+      : await risks.add(documentTemplate);
 
     return { id: data.riskId ? data.riskId : newRisk.id };
   });
@@ -1119,7 +1210,7 @@ exports.activityRAMSDelete = functions
     if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "You do not have editing permissions for this activity.",
+        "You do not have editing permissions for this activity."
       );
     }
 
@@ -1127,7 +1218,10 @@ exports.activityRAMSDelete = functions
     await admin
       .firestore()
       .collection("activities")
-      .doc(data.id).collection("risks").doc(data.riskId).delete();
+      .doc(data.id)
+      .collection("risks")
+      .doc(data.riskId)
+      .delete();
 
     return { id: data.riskId };
   });
@@ -1146,50 +1240,60 @@ exports.activitySignatureSet = functions
       {
         name: "role",
         value: data?.role,
-        rules: [RULES.defined, RULES.string, {
-          condition: (v) => v == null || ["Activity Leader", "Section Leader", "Group Leader"].includes(v),
-          exception: (argumentName) =>
-            new functions.https.HttpsError(
-              "invalid-argument",
-              `The argument ${argumentName} is not a valid role.`,
-            ),
-        }],
+        rules: [
+          RULES.defined,
+          RULES.string,
+          {
+            condition: (v) =>
+              v == null ||
+              ["Activity Leader", "Section Leader", "Group Leader"].includes(v),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} is not a valid role.`
+              ),
+          },
+        ],
       },
       {
         name: "signature",
         value: data?.signature,
-        rules: [RULES.defined, RULES.array, {
-          condition: (v) => {
-            if (v == null) return true;
+        rules: [
+          RULES.defined,
+          RULES.array,
+          {
+            condition: (v) => {
+              if (v == null) return true;
 
-            if (v.length == 0) return false;
+              if (v.length == 0) return false;
 
-            v.forEach((line) => {
-              if (!(v instanceof Object) || !Array.isArray(v)) return false;
+              v.forEach((line) => {
+                if (!(v instanceof Object) || !Array.isArray(v)) return false;
 
-              const lineArray = Object.values(line);
+                const lineArray = Object.values(line);
 
-              if (!Array.isArray(lineArray)) return false;
-              if (lineArray.length == 0) return false;
+                if (!Array.isArray(lineArray)) return false;
+                if (lineArray.length == 0) return false;
 
-              lineArray.forEach((point) => {
-                if (!Array.isArray(point)) return false;
-                if (point.length != 3) return false;
+                lineArray.forEach((point) => {
+                  if (!Array.isArray(point)) return false;
+                  if (point.length != 3) return false;
 
-                point.forEach((point) => {
-                  if (!Number.isInteger(point)) return false;
+                  point.forEach((point) => {
+                    if (!Number.isInteger(point)) return false;
+                  });
                 });
               });
-            });
 
-            return true;
+              return true;
+            },
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} is not valid.`
+              ),
           },
-          exception: (argumentName) =>
-            new functions.https.HttpsError(
-              "invalid-argument",
-              `The argument ${argumentName} is not valid.`,
-            ),
-        }],
+        ],
       },
     ];
     checkRules(fields);
@@ -1207,16 +1311,17 @@ exports.activitySignatureSet = functions
     if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "You do not have editing permissions for this activity.",
+        "You do not have editing permissions for this activity."
       );
     }
 
     // Prevent if non activity leader is updating the activity leader information
-    if (data.role === "Activity Leader" &&
-      activity.data().peopleByUID[context.auth.uid] !== "Activity Leader") {
+    if (
+      data.role === "Activity Leader" &&
+      activity.data().peopleByUID[context.auth.uid] !== "Activity Leader"
+    ) {
       throw accessError();
     }
-
 
     // Sort out data to write to firestore
     const now = new Date();
@@ -1242,18 +1347,14 @@ exports.activitySignatureSet = functions
 
 exports.userCreated = functions.auth.user().onCreate(async (user) => {
   // Add user document to database
-  await admin
-    .firestore()
-    .collection("users")
-    .doc(user.uid)
-    .set({
-      birthDate: "",
-      home: "",
-      work: "",
-      cell: "",
-      address: "",
-      contact: {},
-    });
+  await admin.firestore().collection("users").doc(user.uid).set({
+    birthDate: "",
+    home: "",
+    work: "",
+    cell: "",
+    address: "",
+    contact: {},
+  });
 });
 
 // Gets the overview data of an activity
@@ -1273,8 +1374,8 @@ exports.userGet = functions
     // Prepare neccessary data
     const returnData = Object.fromEntries(
       ["birthDate", "home", "work", "cell", "address", "contact"].map(
-        (name) => [name, activity.data()[name]],
-      ),
+        (name) => [name, activity.data()[name]]
+      )
     );
 
     return returnData;
@@ -1346,8 +1447,8 @@ exports.userUpdate = functions
     // Sort out data to write to firestore
     const documentTemplate = Object.fromEntries(
       fields.map((field) =>
-        field.value === undefined ? [] : [field.name, field.value],
-      ),
+        field.value === undefined ? [] : [field.name, field.value]
+      )
     );
 
     delete documentTemplate.undefined;
@@ -1364,7 +1465,6 @@ exports.userUpdate = functions
     return true;
   });
 
-
 exports.activityTableGet = functions
   .region("australia-southeast1")
   .https.onCall(async (data, context) => {
@@ -1372,25 +1472,28 @@ exports.activityTableGet = functions
     if (!context.auth.token.email_verified) throw verifiedError(); // Ensure user's email is verified
     if (!data) throw parametersError(); // Ensure parameters have been provided
     if (!data?.id) throw existError("activity", data.id); // Ensure activity id is given
-    if (!data?.tableId || !["plan", "budget", "route", "emergencyRoute"].includes(data.tableId)) {
+    if (
+      !data?.tableId ||
+      !["plan", "budget", "route", "emergencyRoute"].includes(data.tableId)
+    ) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "The argument tableId is not a valid table.",
+        "The argument tableId is not a valid table."
       );
     }
 
     // Get activity
-    const activityRef = admin
-      .firestore()
-      .collection("activities")
-      .doc(data.id);
+    const activityRef = admin.firestore().collection("activities").doc(data.id);
     const activity = await activityRef.get();
 
     if (!activity.exists) throw existError("activity", data.id); // Check activity exists
     if (!(context.auth.uid in activity.data().peopleByUID)) throw accessError(); // No access
 
     // Set tables
-    const table = await activityRef.collection("tables").doc(data.tableId).get();
+    const table = await activityRef
+      .collection("tables")
+      .doc(data.tableId)
+      .get();
 
     return table.data();
   });
@@ -1406,8 +1509,19 @@ exports.activityTableSet = functions
 
     // Check arguments
     const tableRules = {
-      plan: [[RULES.string], [RULES.string], [RULES.string], [RULES.string], [RULES.string]],
-      budget: [[RULES.string], [RULES.string], [RULES.numberOrBlank], [RULES.numberOrBlank]],
+      plan: [
+        [RULES.string],
+        [RULES.string],
+        [RULES.string],
+        [RULES.string],
+        [RULES.string],
+      ],
+      budget: [
+        [RULES.string],
+        [RULES.string],
+        [RULES.numberOrBlank],
+        [RULES.numberOrBlank],
+      ],
       route: [[RULES.string], [RULES.string], [RULES.string]],
       emergencyRoute: [[RULES.string], [RULES.string], [RULES.string]],
     };
@@ -1416,26 +1530,35 @@ exports.activityTableSet = functions
       {
         name: "tableId",
         value: data?.tableId,
-        rules: [RULES.defined, {
-          condition: (v) => v == null || Object.keys(tableRules).includes(v),
-          exception: (argumentName) =>
-            new functions.https.HttpsError(
-              "invalid-argument",
-              `The argument ${argumentName} is not a valid table.`,
-            ),
-        }],
+        rules: [
+          RULES.defined,
+          {
+            condition: (v) => v == null || Object.keys(tableRules).includes(v),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `The argument ${argumentName} is not a valid table.`
+              ),
+          },
+        ],
       },
       {
         name: "rowChanges",
         value: data?.rowChanges,
-        rules: [RULES.defined, RULES.object, {
-          condition: (v) => v == null || Object.values(v).every((vItem) => Array.isArray(vItem)),
-          exception: (argumentName) =>
-            new functions.https.HttpsError(
-              "invalid-argument",
-              `A value of ${argumentName} is not an array.`,
-            ),
-        }],
+        rules: [
+          RULES.defined,
+          RULES.object,
+          {
+            condition: (v) =>
+              v == null ||
+              Object.values(v).every((vItem) => Array.isArray(vItem)),
+            exception: (argumentName) =>
+              new functions.https.HttpsError(
+                "invalid-argument",
+                `A value of ${argumentName} is not an array.`
+              ),
+          },
+        ],
       },
       {
         name: "removedRows",
@@ -1451,7 +1574,7 @@ exports.activityTableSet = functions
       if (row.length !== rules.length) {
         throw new functions.https.HttpsError(
           "invalid-argument",
-          `Row ${index} is not the correct length.`,
+          `Row ${index} is not the correct length.`
         );
       }
 
@@ -1459,7 +1582,8 @@ exports.activityTableSet = functions
       row.forEach((column, index) => {
         (rules[index] ?? []).forEach((rule) => {
           // Check each rule in each field
-          if (!rule.condition(column)) throw rule.exception(`${data.tableId} column`);
+          if (!rule.condition(column))
+            throw rule.exception(`${data.tableId} column`);
         });
       });
     });
@@ -1471,10 +1595,7 @@ exports.activityTableSet = functions
     });
 
     // Check activity
-    const activityRef = admin
-      .firestore()
-      .collection("activities")
-      .doc(data.id);
+    const activityRef = admin.firestore().collection("activities").doc(data.id);
     const activity = await activityRef.get();
 
     if (!activity.exists) throw existError("activity", data.id); // Activity doesn't exist
@@ -1483,7 +1604,7 @@ exports.activityTableSet = functions
     if (activity.data().peopleByUID[context.auth.uid] === "Viewer") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "You do not have editing permissions for this activity.",
+        "You do not have editing permissions for this activity."
       );
     }
 
